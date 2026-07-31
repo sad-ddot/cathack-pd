@@ -948,42 +948,20 @@ function Library:Window(Opts)
 				Parent                 = Tab.Page;
 				AnchorPoint            = Vector2.new(0, 0);
 				Position               = UDim2.new(0, 0, 0, -6);
-				Size                   = UDim2.new(1, 0, 0, 18);
-				BackgroundColor3       = Color3.fromHex("0E0E0E");
+				Size                   = UDim2.new(1, 0, 0, 20);
+				BackgroundTransparency = 1;
 				BorderSizePixel        = 0;
 				ZIndex                 = 4;
 			});
-			Library:CreateInstance("UIStroke", {
-				Parent          = Bar;
-				Color           = Color3.fromHex("2A2A2A");
-				Thickness       = 1;
-				ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
-				LineJoinMode    = Enum.LineJoinMode.Miter;
-			});
 			Library:CreateInstance("UIListLayout", {
-				Parent            = Bar;
-				FillDirection     = Enum.FillDirection.Horizontal;
-				SortOrder         = Enum.SortOrder.LayoutOrder;
-				Padding           = UDim.new(0, 0);
+				Parent              = Bar;
+				FillDirection       = Enum.FillDirection.Horizontal;
+				SortOrder           = Enum.SortOrder.LayoutOrder;
+				Padding             = UDim.new(0, 4);
 				HorizontalAlignment = Enum.HorizontalAlignment.Left;
 				VerticalAlignment   = Enum.VerticalAlignment.Center;
 			});
-
-			local Under = Library:CreateInstance("Frame", {
-				Name             = "ActiveUnderline";
-				Parent           = Bar;
-				AnchorPoint      = Vector2.new(0, 1);
-				Position         = UDim2.new(0, 0, 1, 0);
-				Size             = UDim2.new(0, 0, 0, 1);
-				BackgroundColor3 = Library.Accent;
-				BorderSizePixel  = 0;
-				ZIndex           = 6;
-				Visible          = false;
-			});
-			Library:RegisterAccent(Under, "BackgroundColor3");
-
 			Tab._SubBar = Bar;
-			Tab._SubBarUnderline = Under;
 		end;
 
 		function TabRef:SubTab(NameOrOpts)
@@ -999,28 +977,67 @@ function Library:Window(Opts)
 				Parent                 = self._SubBar;
 				Size                   = UDim2.new(0, 0, 1, 0);
 				AutomaticSize          = Enum.AutomaticSize.X;
-				BackgroundTransparency = 1;
+				BackgroundColor3       = Color3.fromHex("000000");
 				BorderSizePixel        = 0;
 				AutoButtonColor        = false;
 				Text                   = "";
 				LayoutOrder            = Order;
 			});
+			local BtnGray = Library:CreateInstance("Frame", {
+				Name             = "Gray";
+				Parent           = Btn;
+				Position         = UDim2.new(0, 1, 0, 1);
+				Size             = UDim2.new(1, -2, 1, -2);
+				BackgroundColor3 = Color3.fromHex("393939");
+				BorderSizePixel  = 0;
+			});
+			local BtnInside = Library:CreateInstance("Frame", {
+				Name             = "Inside";
+				Parent           = BtnGray;
+				Position         = UDim2.new(0, 1, 0, 1);
+				Size             = UDim2.new(1, -2, 1, -2);
+				BackgroundColor3 = Color3.fromHex("FFFFFF");
+				BorderSizePixel  = 0;
+			});
+			local BtnGrad = Library:CreateInstance("UIGradient", {
+				Parent   = BtnInside;
+				Rotation = 90;
+				Color    = NewColorSequence({
+					NewColorSequenceKeypoint(0, Color3.fromHex("1F1F1F"));
+					NewColorSequenceKeypoint(1, Color3.fromHex("181818"));
+				});
+			});
+			local BtnAccent = Library:CreateInstance("Frame", {
+				Name             = "AccentTop";
+				Parent           = BtnInside;
+				Size             = UDim2.new(1, 0, 0, 1);
+				BackgroundColor3 = Color3.fromHex("FFFFFF");
+				BorderSizePixel  = 0;
+				BackgroundTransparency = 1;
+				ZIndex           = 5;
+			});
+			local BtnAccentGrad = Library:CreateInstance("UIGradient", {
+				Parent   = BtnAccent;
+				Rotation = 0;
+			});
+			Library:RegisterAccentGradient(BtnAccentGrad);
 			Library:CreateInstance("UIPadding", {
-				Parent       = Btn;
+				Parent       = BtnInside;
 				PaddingLeft  = UDim.new(0, 10);
 				PaddingRight = UDim.new(0, 10);
 			});
 			local Lbl = Library:CreateInstance("TextLabel", {
 				Name                   = "Label";
-				Parent                 = Btn;
+				Parent                 = BtnInside;
 				Size                   = UDim2.new(1, 0, 1, 0);
 				AutomaticSize          = Enum.AutomaticSize.X;
 				BackgroundTransparency = 1;
 				Text                   = Name;
-				TextColor3             = Color3.fromHex("707076");
-				TextSize               = 12;
+				TextColor3             = Color3.fromHex("8C8F99");
+				TextSize                = 12;
 				TextXAlignment         = Enum.TextXAlignment.Center;
 				TextYAlignment         = Enum.TextYAlignment.Center;
+				ZIndex                 = 6;
 			});
 			if ProggyCleanFont then Lbl.FontFace = ProggyCleanFont end;
 
@@ -1098,18 +1115,19 @@ function Library:Window(Opts)
 			};
 
 			local FadeInfo = TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out);
-			local function ApplyUnderline()
-				local Under = ParentTab._SubBarUnderline;
-				if not Under then return end;
-				Under.Visible = true;
-				local Ap = Btn.AbsolutePosition;
-				local As = Btn.AbsoluteSize;
-				local Bp = ParentTab._SubBar.AbsolutePosition;
-				Library:Tween(Under, FadeInfo, {
-					Position = UDim2.new(0, Ap.X - Bp.X, 1, 0);
-					Size     = UDim2.new(0, As.X, 0, 1);
-				}):Play();
+			local InactiveA = Color3.fromHex("1F1F1F");
+			local InactiveB = Color3.fromHex("181818");
+			local ActiveA   = Color3.fromHex("161616");
+			local ActiveB   = Color3.fromHex("151515");
+			local function ApplyGrad(Active)
+				local A = Active and ActiveA or InactiveA;
+				local B = Active and ActiveB or InactiveB;
+				BtnGrad.Color = NewColorSequence({
+					NewColorSequenceKeypoint(0, A);
+					NewColorSequenceKeypoint(1, B);
+				});
 			end;
+			ApplyGrad(false);
 
 			function SubRef:SetActive(State)
 				self.Active = State;
@@ -1117,11 +1135,14 @@ function Library:Window(Opts)
 					self.Page.Visible = true;
 					Library:Tween(self.Page, FadeInfo, { GroupTransparency = 0 }):Play();
 					Library:Tween(self.Label, FadeInfo, { TextColor3 = Color3.fromHex("FFFFFF") }):Play();
-					ApplyUnderline();
+					BtnAccent.BackgroundTransparency = 0;
+					ApplyGrad(true);
 				else
 					local P = self.Page;
 					Library:Tween(P, FadeInfo, { GroupTransparency = 1 }):Play();
-					Library:Tween(self.Label, FadeInfo, { TextColor3 = Color3.fromHex("707076") }):Play();
+					Library:Tween(self.Label, FadeInfo, { TextColor3 = Color3.fromHex("8C8F99") }):Play();
+					BtnAccent.BackgroundTransparency = 1;
+					ApplyGrad(false);
 					task.delay(FadeInfo.Time, function()
 						if not self.Active then P.Visible = false end;
 					end);
@@ -1146,12 +1167,7 @@ function Library:Window(Opts)
 				end;
 				SubRef:SetActive(true);
 			end);
-			Library:Connection(Btn:GetPropertyChangedSignal("AbsolutePosition"), function()
-				if SubRef.Active then ApplyUnderline() end;
-			end);
-			Library:Connection(Btn:GetPropertyChangedSignal("AbsoluteSize"), function()
-				if SubRef.Active then ApplyUnderline() end;
-			end);
+
 
 			table.insert(self._SubTabs, SubRef);
 			if #self._SubTabs == 1 then
@@ -1522,11 +1538,114 @@ function Library:Window(Opts)
 					end;
 
 					KBtn.MouseButton1Click:Connect(StartListen);
-					KBtn.MouseButton2Click:Connect(function()
-						if Listening then CancelListen() end;
-						Key = nil;
-						Refresh();
-						Library:NotifyKeybind();
+
+					local ModePopup = Library:CreateInstance("CanvasGroup", {
+						Name              = "ModePopup";
+						Parent            = (gethui and gethui()) or CoreGui;
+						Size              = UDim2.fromOffset(78, 50);
+						BackgroundColor3  = Color3.fromHex("000000");
+						BorderSizePixel   = 0;
+						Visible           = false;
+						GroupTransparency = 1;
+						ZIndex            = 60;
+					});
+					Library:CreateInstance("UIStroke", {
+						Parent = ModePopup; Color = Color3.fromHex("000000"); Thickness = 1;
+					});
+					local MPGray = Library:CreateInstance("Frame", {
+						Parent = ModePopup; Position = UDim2.new(0, 1, 0, 1); Size = UDim2.new(1, -2, 1, -2);
+						BackgroundColor3 = Color3.fromHex("393939"); BorderSizePixel = 0; ZIndex = 61;
+					});
+					local MPInside = Library:CreateInstance("Frame", {
+						Parent = MPGray; Position = UDim2.new(0, 1, 0, 1); Size = UDim2.new(1, -2, 1, -2);
+						BackgroundColor3 = Color3.fromHex("161616"); BorderSizePixel = 0; ZIndex = 62;
+					});
+					Library:CreateInstance("UIListLayout", {
+						Parent = MPInside; FillDirection = Enum.FillDirection.Vertical;
+						SortOrder = Enum.SortOrder.LayoutOrder; Padding = UDim.new(0, 0);
+					});
+					Library:CreateInstance("UIPadding", {
+						Parent = MPInside; PaddingTop = UDim.new(0, 2); PaddingBottom = UDim.new(0, 2);
+					});
+
+					local PopupOpen = false;
+					local PopupToken = 0;
+					local PopupInfo = TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out);
+					local ModeBtns = {};
+					local function RefreshModeBtns()
+						for M, B in ModeBtns do
+							B.TextColor3 = (M == BindMode) and Library.Accent or Color3.fromHex("FFFFFF");
+						end;
+					end;
+					local function ClosePopup()
+						if not PopupOpen then return end;
+						PopupOpen = false;
+						PopupToken = PopupToken + 1;
+						local Mine = PopupToken;
+						Library:Tween(ModePopup, PopupInfo, { GroupTransparency = 1 }):Play();
+						task.delay(PopupInfo.Time, function()
+							if PopupToken == Mine then ModePopup.Visible = false end;
+						end);
+					end;
+					local function OpenPopup()
+						if PopupOpen then ClosePopup(); return end;
+						PopupOpen = true;
+						PopupToken = PopupToken + 1;
+						RefreshModeBtns();
+						local Ap = KBtn.AbsolutePosition;
+						local Sz = KBtn.AbsoluteSize;
+						ModePopup.Position = UDim2.fromOffset(Ap.X + Sz.X - 78, Ap.Y + Sz.Y + 2);
+						ModePopup.GroupTransparency = 1;
+						ModePopup.Visible = true;
+						Library:Tween(ModePopup, PopupInfo, { GroupTransparency = 0 }):Play();
+					end;
+					local ModeOpts = { "Hold", "Toggle", "Always" };
+					for I, M in ModeOpts do
+						local Btn = Library:CreateInstance("TextButton", {
+							Parent                 = MPInside;
+							Size                   = UDim2.new(1, 0, 0, 14);
+							BackgroundTransparency = 1;
+							BorderSizePixel        = 0;
+							AutoButtonColor        = false;
+							Text                   = M;
+							TextColor3             = Color3.fromHex("FFFFFF");
+							TextSize               = 12;
+							TextXAlignment         = Enum.TextXAlignment.Left;
+							LayoutOrder            = I;
+							ZIndex                 = 63;
+						});
+						Library:CreateInstance("UIPadding", { Parent = Btn; PaddingLeft = UDim.new(0, 6) });
+						if ProggyCleanFont then Btn.FontFace = ProggyCleanFont end;
+						ModeBtns[M:lower()] = Btn;
+						Btn.MouseButton1Click:Connect(function()
+							BindMode = M:lower();
+							if BindMode == "always" then
+								SetState(true);
+							end;
+							RefreshModeBtns();
+							Refresh();
+							Library:NotifyKeybind();
+							ClosePopup();
+						end);
+					end;
+					RefreshModeBtns();
+
+					KBtn.MouseButton2Click:Connect(OpenPopup);
+
+					Library:Connection(UserInputService.InputBegan, function(Input)
+						if not PopupOpen then return end;
+						if Input.UserInputType ~= Enum.UserInputType.MouseButton1
+							and Input.UserInputType ~= Enum.UserInputType.MouseButton2 then return end;
+						local M = UserInputService:GetMouseLocation();
+						local Ap = ModePopup.AbsolutePosition;
+						local Sz = ModePopup.AbsoluteSize;
+						if M.X < Ap.X or M.Y < Ap.Y or M.X > Ap.X + Sz.X or M.Y > Ap.Y + Sz.Y then
+							local Bp = KBtn.AbsolutePosition;
+							local Bs = KBtn.AbsoluteSize;
+							if M.X < Bp.X or M.Y < Bp.Y or M.X > Bp.X + Bs.X or M.Y > Bp.Y + Bs.Y then
+								ClosePopup();
+							end;
+						end;
 					end);
 
 					local function KeyMatches(Input)
@@ -1545,7 +1664,7 @@ function Library:Window(Opts)
 						if not KeyMatches(Input) then return end;
 						if BindMode == "hold" then
 							SetState(true);
-						else
+						elseif BindMode == "toggle" then
 							SetState(not State);
 						end;
 					end);
@@ -1554,10 +1673,11 @@ function Library:Window(Opts)
 						if not KeyMatches(Input) then return end;
 						SetState(false);
 					end);
+					if BindMode == "always" then SetState(true) end;
 
 					Library:RegisterKeybind({
 						Name     = Name;
-						Mode     = BindMode;
+						GetMode  = function() return BindMode end;
 						GetKey   = function() return Key end;
 						GetState = function() return State end;
 					});
@@ -4929,7 +5049,7 @@ function Library:Window(Opts)
 					Acc = 0;
 					local Opts = Library.Flags.WatermarkOpts or {};
 					local Parts = {};
-					if Opts.Title              then table.insert(Parts, "Coincide") end;
+					if Opts.Title              then table.insert(Parts, "CatHack") end;
 					if Opts.Fps                then table.insert(Parts, Fps .. " fps") end;
 					if Opts.Ping and LP        then table.insert(Parts, math.round(LP:GetNetworkPing() * 1000) .. " ms") end;
 					if Opts["Game Name"]       then table.insert(Parts, GameName) end;
@@ -5219,6 +5339,15 @@ function Library:KeybindList(Opts)
 	local Rows      = {};
 	local RowInfos  = {};
 	local Idle      = Color3.fromHex("BFC4CC");
+	local Dim       = Color3.fromHex("707076");
+	local function ModeTag(Mode)
+		if not Mode then return "" end;
+		Mode = string.lower(tostring(Mode));
+		if Mode == "hold" then return "[H]" end;
+		if Mode == "toggle" then return "[T]" end;
+		if Mode == "always" then return "[A]" end;
+		return "";
+	end;
 	local function Rebuild()
 		for _, R in Rows do R:Destroy() end;
 		table.clear(Rows);
@@ -5239,13 +5368,25 @@ function Library:KeybindList(Opts)
 					Parent                 = Row;
 					AnchorPoint            = Vector2.new(0, 0.5);
 					Position               = UDim2.new(0, 0, 0.5, 0);
-					Size                   = UDim2.new(1, -50, 1, 0);
+					Size                   = UDim2.new(1, -76, 1, 0);
 					BackgroundTransparency = 1;
 					Text                   = DisplayName;
 					RichText               = true;
 					TextColor3             = Idle;
 					TextSize               = 12;
 					TextXAlignment         = Enum.TextXAlignment.Left;
+					TextYAlignment         = Enum.TextYAlignment.Center;
+				});
+				local ModeLbl = Library:CreateInstance("TextLabel", {
+					Parent                 = Row;
+					AnchorPoint            = Vector2.new(1, 0.5);
+					Position               = UDim2.new(1, -48, 0.5, 0);
+					Size                   = UDim2.new(0, 22, 1, 0);
+					BackgroundTransparency = 1;
+					Text                   = ModeTag(Entry.GetMode and Entry.GetMode() or Entry.Mode);
+					TextColor3             = Dim;
+					TextSize               = 12;
+					TextXAlignment         = Enum.TextXAlignment.Right;
 					TextYAlignment         = Enum.TextYAlignment.Center;
 				});
 				local KeyLbl = Library:CreateInstance("TextLabel", {
@@ -5256,16 +5397,17 @@ function Library:KeybindList(Opts)
 					BackgroundTransparency = 1;
 					Text                   = KeyName(Key);
 					TextColor3             = Idle;
-					TextSize               = 12;
+					TextSize                = 12;
 					TextXAlignment         = Enum.TextXAlignment.Right;
 					TextYAlignment         = Enum.TextYAlignment.Center;
 				});
 				if ProggyCleanFont then
 					NameLbl.FontFace = ProggyCleanFont;
 					KeyLbl.FontFace  = ProggyCleanFont;
+					ModeLbl.FontFace = ProggyCleanFont;
 				end;
 				table.insert(Rows, Row);
-				table.insert(RowInfos, { Entry = Entry, NameLbl = NameLbl, KeyLbl = KeyLbl, LastActive = false });
+				table.insert(RowInfos, { Entry = Entry, NameLbl = NameLbl, KeyLbl = KeyLbl, ModeLbl = ModeLbl, LastActive = false, LastMode = "" });
 			end;
 		end;
 	end;
@@ -5278,18 +5420,34 @@ function Library:KeybindList(Opts)
 				return Info.Entry and Info.Entry.GetState and Info.Entry.GetState() and true or false;
 			end);
 			if not Ok then Active = false end;
+			local Mode = "";
+			if Info.Entry then
+				if Info.Entry.GetMode then
+					local Ok2, M = pcall(Info.Entry.GetMode);
+					if Ok2 then Mode = tostring(M or "") end;
+				elseif Info.Entry.Mode then
+					Mode = tostring(Info.Entry.Mode);
+				end;
+			end;
+			if Mode ~= Info.LastMode then
+				Info.LastMode = Mode;
+				Info.ModeLbl.Text = ModeTag(Mode);
+			end;
 			if Active ~= Info.LastActive then
 				Info.LastActive = Active;
 				if Active then
 					Info.NameLbl.TextColor3 = Ac;
 					Info.KeyLbl.TextColor3  = Ac;
+					Info.ModeLbl.TextColor3 = Ac;
 				else
 					Info.NameLbl.TextColor3 = Idle;
 					Info.KeyLbl.TextColor3  = Idle;
+					Info.ModeLbl.TextColor3 = Dim;
 				end;
 			elseif Active then
 				Info.NameLbl.TextColor3 = Ac;
 				Info.KeyLbl.TextColor3  = Ac;
+				Info.ModeLbl.TextColor3 = Ac;
 			end;
 		end;
 	end);
@@ -5723,7 +5881,7 @@ function Library:TargetIndicator(Opts)
 		IgnoreGuiInset = true;
 		ResetOnSpawn   = false;
 	});
-	local W, H = 240, 90;
+	local W, H = 320, 128;
 	local Outer, Inner = CoincideChrome(self, Gui, W, H);
 	Outer.AnchorPoint = Vector2.new(0, 1);
 	Outer.Position    = UDim2.new(0, 12, 1, -180);
@@ -5733,8 +5891,8 @@ function Library:TargetIndicator(Opts)
 	local Avatar = self:CreateInstance("ImageLabel", {
 		Name                   = "Avatar";
 		Parent                 = Inner;
-		Position               = UDim2.fromOffset(8, 10);
-		Size                   = UDim2.fromOffset(48, 48);
+		Position               = UDim2.fromOffset(10, 14);
+		Size                   = UDim2.fromOffset(70, 70);
 		BackgroundColor3       = Color3.fromHex("000000");
 		BorderSizePixel        = 0;
 		Image                  = "rbxasset://textures/ui/GuiImagePlaceholder.png";
@@ -5746,12 +5904,12 @@ function Library:TargetIndicator(Opts)
 
 	local NameLbl = self:CreateInstance("TextLabel", {
 		Name = "Name"; Parent = Inner;
-		Position = UDim2.fromOffset(64, 8);
-		Size = UDim2.new(1, -72, 0, 14);
+		Position = UDim2.fromOffset(90, 12);
+		Size = UDim2.new(1, -100, 0, 18);
 		BackgroundTransparency = 1;
 		Text = "no target";
 		TextColor3 = Color3.fromHex("FFFFFF");
-		TextSize = 12;
+		TextSize = 14;
 		TextXAlignment = Enum.TextXAlignment.Left;
 		TextTruncate = Enum.TextTruncate.AtEnd;
 	});
@@ -5759,12 +5917,12 @@ function Library:TargetIndicator(Opts)
 
 	local WeaponLbl = self:CreateInstance("TextLabel", {
 		Name = "Weapon"; Parent = Inner;
-		Position = UDim2.fromOffset(64, 24);
-		Size = UDim2.new(1, -72, 0, 12);
+		Position = UDim2.fromOffset(90, 32);
+		Size = UDim2.new(1, -100, 0, 14);
 		BackgroundTransparency = 1;
 		Text = "weapon: none";
 		TextColor3 = Color3.fromHex("8C8F99");
-		TextSize = 11;
+		TextSize = 12;
 		TextXAlignment = Enum.TextXAlignment.Left;
 		TextTruncate = Enum.TextTruncate.AtEnd;
 	});
@@ -5772,20 +5930,20 @@ function Library:TargetIndicator(Opts)
 
 	local DistLbl = self:CreateInstance("TextLabel", {
 		Name = "Dist"; Parent = Inner;
-		Position = UDim2.fromOffset(64, 38);
-		Size = UDim2.new(1, -72, 0, 12);
+		Position = UDim2.fromOffset(90, 48);
+		Size = UDim2.new(1, -100, 0, 14);
 		BackgroundTransparency = 1;
 		Text = "dist: 0";
 		TextColor3 = Color3.fromHex("8C8F99");
-		TextSize = 11;
+		TextSize = 12;
 		TextXAlignment = Enum.TextXAlignment.Left;
 	});
 	if ProggyCleanFont then DistLbl.FontFace = ProggyCleanFont end;
 
 	local HpBg = self:CreateInstance("Frame", {
 		Name = "HpBg"; Parent = Inner;
-		Position = UDim2.fromOffset(64, 54);
-		Size = UDim2.new(1, -72, 0, 8);
+		Position = UDim2.fromOffset(90, 68);
+		Size = UDim2.new(1, -100, 0, 12);
 		BackgroundColor3 = Color3.fromHex("000000");
 		BorderSizePixel = 0;
 	});
@@ -5803,19 +5961,20 @@ function Library:TargetIndicator(Opts)
 		BackgroundTransparency = 1;
 		Text = "100/100";
 		TextColor3 = Color3.fromHex("FFFFFF");
-		TextSize = 9;
+		TextSize = 11;
 		TextXAlignment = Enum.TextXAlignment.Right;
+		ZIndex = 5;
 	});
 	if ProggyCleanFont then HpText.FontFace = ProggyCleanFont end;
 
 	local StatusLbl = self:CreateInstance("TextLabel", {
 		Name = "Status"; Parent = Inner;
-		Position = UDim2.fromOffset(64, 66);
-		Size = UDim2.new(1, -72, 0, 14);
+		Position = UDim2.fromOffset(90, 86);
+		Size = UDim2.new(1, -100, 0, 16);
 		BackgroundTransparency = 1;
 		Text = "";
 		TextColor3 = self.Accent;
-		TextSize = 11;
+		TextSize = 12;
 		TextXAlignment = Enum.TextXAlignment.Left;
 		Visible = false;
 	});
@@ -5833,13 +5992,23 @@ function Library:TargetIndicator(Opts)
 			Avatar.Image = "rbxasset://textures/ui/GuiImagePlaceholder.png";
 			return;
 		end;
-		local Nm = typeof(Target) == "Instance" and Target.Name or tostring(Target);
+		local Nm;
+		local Uid;
+		if typeof(Target) == "Instance" then
+			Nm = Target.Name;
+			if Target:IsA("Player") then Uid = Target.UserId end;
+		elseif type(Target) == "table" then
+			Nm = tostring(Target.Name or Target.name or Target.DisplayName or "target");
+			Uid = tonumber(Target.UserId or Target.userId or Target.Id);
+		else
+			Nm = tostring(Target);
+		end;
 		NameLbl.Text = Nm;
-		pcall(function()
-			if typeof(Target) == "Instance" and Target:IsA("Player") then
-				Avatar.Image = game:GetService("Players"):GetUserThumbnailAsync(Target.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100);
-			end;
-		end);
+		if Uid then
+			pcall(function()
+				Avatar.Image = game:GetService("Players"):GetUserThumbnailAsync(Uid, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100);
+			end);
+		end;
 	end;
 	function Ind:SetWeapon(W) WeaponLbl.Text = "weapon: " .. tostring(W or "none") end;
 	function Ind:SetDistance(D) DistLbl.Text = "dist: " .. tostring(D or 0) end;
@@ -5896,7 +6065,7 @@ function Library:InventoryViewer(Opts)
 		IgnoreGuiInset = true;
 		ResetOnSpawn   = false;
 	});
-	local W, H = 300, 260;
+	local W, H = 420, 380;
 	local Outer, Inner = CoincideChrome(self, Gui, W, H);
 	Outer.Position = UDim2.fromOffset(20, 320);
 
@@ -5904,12 +6073,12 @@ function Library:InventoryViewer(Opts)
 
 	local Title = self:CreateInstance("TextLabel", {
 		Name = "Title"; Parent = Inner;
-		Position = UDim2.fromOffset(8, 6);
-		Size = UDim2.new(1, -16, 0, 14);
+		Position = UDim2.fromOffset(10, 8);
+		Size = UDim2.new(1, -20, 0, 16);
 		BackgroundTransparency = 1;
 		Text = tostring(Opts.Name or "inventory viewer");
 		TextColor3 = self.Accent;
-		TextSize = 12;
+		TextSize = 13;
 		TextXAlignment = Enum.TextXAlignment.Left;
 	});
 	self:RegisterAccent(Title, "TextColor3");
@@ -5917,24 +6086,24 @@ function Library:InventoryViewer(Opts)
 
 	local Summary = self:CreateInstance("TextLabel", {
 		Name = "Summary"; Parent = Inner;
-		Position = UDim2.fromOffset(8, 20);
-		Size = UDim2.new(1, -16, 0, 12);
+		Position = UDim2.fromOffset(10, 26);
+		Size = UDim2.new(1, -20, 0, 14);
 		BackgroundTransparency = 1;
 		Text = "0 items";
 		TextColor3 = Color3.fromHex("FFFFFF");
-		TextSize = 11;
+		TextSize = 12;
 		TextXAlignment = Enum.TextXAlignment.Left;
 	});
 	if ProggyCleanFont then Summary.FontFace = ProggyCleanFont end;
 
 	local TargetLbl = self:CreateInstance("TextLabel", {
 		Name = "Target"; Parent = Inner;
-		Position = UDim2.fromOffset(8, 33);
-		Size = UDim2.new(1, -16, 0, 12);
+		Position = UDim2.fromOffset(10, 42);
+		Size = UDim2.new(1, -20, 0, 14);
 		BackgroundTransparency = 1;
 		Text = "no target";
 		TextColor3 = Color3.fromHex("8C8F99");
-		TextSize = 11;
+		TextSize = 12;
 		TextXAlignment = Enum.TextXAlignment.Left;
 		TextTruncate = Enum.TextTruncate.AtEnd;
 	});
@@ -5942,8 +6111,8 @@ function Library:InventoryViewer(Opts)
 
 	local Body = self:CreateInstance("ScrollingFrame", {
 		Name = "Body"; Parent = Inner;
-		Position = UDim2.fromOffset(6, 50);
-		Size = UDim2.new(1, -12, 1, -56);
+		Position = UDim2.fromOffset(8, 62);
+		Size = UDim2.new(1, -16, 1, -70);
 		BackgroundColor3 = Color3.fromHex("0A0A0A");
 		BorderSizePixel = 0;
 		CanvasSize = UDim2.new(0, 0, 0, 0);
@@ -6012,14 +6181,14 @@ function Library:InventoryViewer(Opts)
 
 		local GridHolder = Library:CreateInstance("Frame", {
 			Parent = Body;
-			Size = UDim2.new(1, 0, 0, 60);
+			Size = UDim2.new(1, 0, 0, 78);
 			BackgroundTransparency = 1;
 			LayoutOrder = Ord * 2 + 1;
 		});
 		local Grid = Library:CreateInstance("UIGridLayout", {
 			Parent = GridHolder;
-			CellSize = UDim2.fromOffset(56, 60);
-			CellPadding = UDim2.fromOffset(4, 4);
+			CellSize = UDim2.fromOffset(72, 78);
+			CellPadding = UDim2.fromOffset(6, 6);
 			SortOrder = Enum.SortOrder.LayoutOrder;
 		});
 		Grid:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
@@ -6029,7 +6198,7 @@ function Library:InventoryViewer(Opts)
 		for I, It in Items do
 			local Slot = Library:CreateInstance("Frame", {
 				Parent = GridHolder;
-				Size = UDim2.fromOffset(56, 60);
+				Size = UDim2.fromOffset(72, 78);
 				BackgroundColor3 = Color3.fromHex("161616");
 				BorderSizePixel = 0;
 				LayoutOrder = I;
@@ -6046,31 +6215,31 @@ function Library:InventoryViewer(Opts)
 			});
 			Library:CreateInstance("ImageLabel", {
 				Parent = Slot;
-				Size = UDim2.fromOffset(34, 34);
-				Position = UDim2.fromOffset(11, 4);
+				Size = UDim2.fromOffset(46, 46);
+				Position = UDim2.fromOffset(13, 6);
 				BackgroundTransparency = 1;
 				Image = tostring(It.icon or "");
 				ScaleType = Enum.ScaleType.Fit;
 			});
 			local NLbl = Library:CreateInstance("TextLabel", {
 				Parent = Slot;
-				Size = UDim2.new(1, -4, 0, 11);
-				Position = UDim2.fromOffset(2, 40);
+				Size = UDim2.new(1, -6, 0, 12);
+				Position = UDim2.fromOffset(3, 54);
 				BackgroundTransparency = 1;
 				Text = It.name;
 				TextColor3 = Color3.fromHex("FFFFFF");
-				TextSize = 9;
+				TextSize = 11;
 				TextTruncate = Enum.TextTruncate.AtEnd;
 			});
 			if ProggyCleanFont then NLbl.FontFace = ProggyCleanFont end;
 			local ALbl = Library:CreateInstance("TextLabel", {
 				Parent = Slot;
-				Size = UDim2.new(1, -4, 0, 10);
-				Position = UDim2.fromOffset(2, 50);
+				Size = UDim2.new(1, -6, 0, 11);
+				Position = UDim2.fromOffset(3, 65);
 				BackgroundTransparency = 1;
 				Text = It.amount and tostring(It.amount) or "";
 				TextColor3 = Library.Accent;
-				TextSize = 9;
+				TextSize = 10;
 				TextXAlignment = Enum.TextXAlignment.Right;
 			});
 			Library:RegisterAccent(ALbl, "TextColor3");
