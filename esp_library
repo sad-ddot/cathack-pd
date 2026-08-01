@@ -1,1 +1,898 @@
---nga
+local ESPLib = {}
+ESPLib.__index = ESPLib
+ESPLib._version = "0.2.0"
+
+local RunService = game:GetService("RunService")
+local Players    = game:GetService("Players")
+local Workspace  = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+local function safe_pos(p)
+    if not p then return nil end
+    local ok, x, y, z = pcall(function() return p.X, p.Y, p.Z end)
+    if not ok then return nil end
+    if x ~= x or y ~= y or z ~= z then return nil end
+    return Vector3.new(x, y, z)
+end
+
+local function safe_wtvp(pos)
+    if not pos then return nil, false end
+    local ok, sp, on = pcall(Camera.WorldToViewportPoint, Camera, pos)
+    if not ok then return nil, false end
+    return sp, on
+end
+
+local function is_valid_target(model)
+    if not model or not model.Parent then return false end
+    local hum = model:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return false end
+    local hrp = model:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    return true, hum, hrp
+end
+
+local function new_drawing(kind, props)
+    local ok, d = pcall(Drawing.new, kind)
+    if not ok or not d then return nil end
+    if props then
+        for k, v in pairs(props) do
+            pcall(function() d[k] = v end)
+        end
+    end
+    return d
+end
+
+local function set_vis_all(objs, vis)
+    for _, d in pairs(objs) do
+        if d then pcall(function() d.Visible = vis end) end
+    end
+end
+
+local function destroy_all(objs)
+    for k, d in pairs(objs) do
+        if d then pcall(function() d:Remove() end) end
+        objs[k] = nil
+    end
+end
+
+local skeleton_bones = {
+    { "Head", "UpperTorso" },
+    { "UpperTorso", "LowerTorso" },
+    { "UpperTorso", "LeftUpperArm" }, { "LeftUpperArm", "LeftLowerArm" }, { "LeftLowerArm", "LeftHand" },
+    { "UpperTorso", "RightUpperArm" }, { "RightUpperArm", "RightLowerArm" }, { "RightLowerArm", "RightHand" },
+    { "LowerTorso", "LeftUpperLeg" }, { "LeftUpperLeg", "LeftLowerLeg" }, { "LeftLowerLeg", "LeftFoot" },
+    { "LowerTorso", "RightUpperLeg" }, { "RightUpperLeg", "RightLowerLeg" }, { "RightLowerLeg", "RightFoot" },
+}
+
+local DEFAULT_STYLE = {
+    enabled = true,
+    max_distance = 3000,
+
+    fps_cap = 60,
+    distance_based_fps = false,
+    dist_thresh_stud = 500,
+    dist_low_hz = 15,
+
+    teamcheck = false,
+    friendcheck = false,
+    include_ai = true,
+
+    box = { enabled = true, thickness = 1, color = Color3.fromRGB(255,255,255), transparency = 1 },
+    box_outline = { enabled = true, thickness = 3, color = Color3.fromRGB(0,0,0), transparency = 1 },
+    box_fill = { enabled = false, color = Color3.fromRGB(0,0,0), transparency = 0.35 },
+
+    name = { enabled = true, size = 13, font = 2, color = Color3.fromRGB(255,255,255), outline = true, outline_color = Color3.fromRGB(0,0,0) },
+    displayname = { enabled = false, size = 12, font = 2, color = Color3.fromRGB(200,200,200), outline = true, outline_color = Color3.fromRGB(0,0,0) },
+    distance = { enabled = true, size = 12, font = 2, color = Color3.fromRGB(200,200,200), outline = true, outline_color = Color3.fromRGB(0,0,0), suffix = "m" },
+    weapon = { enabled = false, size = 12, font = 2, color = Color3.fromRGB(200,200,200), outline = true, outline_color = Color3.fromRGB(0,0,0) },
+
+    health = {
+        enabled = true,
+        thickness = 3,
+        outline_thickness = 1,
+        outline_color = Color3.fromRGB(0,0,0),
+        color_full = Color3.fromRGB(90, 220, 90),
+        color_low = Color3.fromRGB(220, 90, 90),
+        show_text = false,
+        text_size = 11,
+        text_font = 2,
+        gradient = true,
+    },
+
+    skeleton = { enabled = false, color = Color3.fromRGB(255,255,255), thickness = 1 },
+
+    chams = {
+        enabled = false,
+        style = "Glow",
+        hidden_color = Color3.fromRGB(152, 188, 255),
+        hidden_transparency = 0,
+        visible_color = Color3.fromRGB(152, 188, 255),
+        visible_transparency = 0.5,
+        outline_color = Color3.fromRGB(0, 0, 0),
+        outline_transparency = 0.3,
+        depth_mode = Enum.HighlightDepthMode.AlwaysOnTop,
+        refresh_rate = 0.2,
+    },
+
+    loot = {
+        enabled = false,
+        max_distance = 250,
+        color = Color3.fromRGB(255, 220, 80),
+        text_size = 12,
+        text_font = 2,
+        outline = true,
+        outline_color = Color3.fromRGB(0, 0, 0),
+        show_distance = true,
+        min_worth = 0,
+    },
+
+    trail = {
+        enabled = false,
+        color = Color3.fromRGB(255, 255, 255),
+        segment_life = 3.0,
+        max_segments = 40,
+        thickness = 2,
+        transparency = 0.4,
+    },
+
+    visible_color = nil,
+    hitscan_color = nil,
+
+    off_screen_arrow = { enabled = false, size = 20, color = Color3.fromRGB(255,80,80), radius = 200 },
+}
+
+local function deep_merge(dst, src)
+    for k, v in pairs(src) do
+        if type(v) == "table" and type(dst[k]) == "table" then
+            deep_merge(dst[k], v)
+        elseif dst[k] == nil then
+            dst[k] = v
+        end
+    end
+end
+
+function ESPLib.new(config)
+    local self = setmetatable({}, ESPLib)
+    self.style = {}
+    for k, v in pairs(DEFAULT_STYLE) do
+        if type(v) == "table" then
+            self.style[k] = {}
+            for kk, vv in pairs(v) do self.style[k][kk] = vv end
+        else
+            self.style[k] = v
+        end
+    end
+    if config then deep_merge(self.style, config) end
+
+    self._entries = {}
+    self._loot_entries = {}
+    self._trail_data = {}
+    self._connections = {}
+    self._last_frame = 0
+    self._last_dist_frame = {}
+    self._last_loot_scan = 0
+    self._last_trail_tick = 0
+    self._container = Instance.new("Folder")
+    self._container.Name = "_hl_c"
+    self._container.Parent = Workspace
+    self._is_target_fn = nil
+    self._visible_check_fn = nil
+    self._hitscan_check_fn = nil
+    self._weapon_getter = nil
+    self._loot_root_getter = nil
+    self._loot_worth_getter = nil
+
+    return self
+end
+
+function ESPLib:SetTargetFilter(fn) self._is_target_fn = fn end
+function ESPLib:SetVisibleCheck(fn) self._visible_check_fn = fn end
+function ESPLib:SetHitscanCheck(fn) self._hitscan_check_fn = fn end
+function ESPLib:SetWeaponGetter(fn) self._weapon_getter = fn end
+
+function ESPLib:_should_track(subject, is_npc)
+    if is_npc and not self.style.include_ai then return false end
+    if not is_npc then
+        if subject == LocalPlayer then return false end
+        if self.style.teamcheck and subject.Team and LocalPlayer.Team and subject.Team == LocalPlayer.Team then return false end
+        if self._is_target_fn then
+            local ok, res = pcall(self._is_target_fn, subject)
+            if ok and res == false then return false end
+        end
+    end
+    return true
+end
+
+function ESPLib:_get_model(subject, is_npc)
+    if is_npc then return subject end
+    return subject.Character
+end
+
+function ESPLib:_create_entry(subject, is_npc)
+    local entry = {
+        subject = subject,
+        is_npc = is_npc,
+        objs = {},
+        skel = {},
+        chams = nil,
+        visible = false,
+        last_seen = 0,
+        _last_char = nil,
+    }
+    entry.objs.box         = new_drawing("Square", { Filled = false, Visible = false, Thickness = 1 })
+    entry.objs.box_outline = new_drawing("Square", { Filled = false, Visible = false, Thickness = 3, ZIndex = -1 })
+    entry.objs.box_fill    = new_drawing("Square", { Filled = true,  Visible = false, ZIndex = -2 })
+
+    entry.objs.name        = new_drawing("Text", { Center = true, Visible = false })
+    entry.objs.displayname = new_drawing("Text", { Center = true, Visible = false })
+    entry.objs.distance    = new_drawing("Text", { Center = true, Visible = false })
+    entry.objs.weapon      = new_drawing("Text", { Center = true, Visible = false })
+
+    entry.objs.hp_bar_bg   = new_drawing("Line", { Visible = false, Thickness = 5, Color = Color3.fromRGB(0,0,0), ZIndex = 1 })
+    entry.objs.hp_bar      = new_drawing("Line", { Visible = false, Thickness = 3, ZIndex = 2 })
+    entry.objs.hp_text     = new_drawing("Text", { Center = false, Visible = false })
+
+    entry.objs.arrow       = new_drawing("Triangle", { Filled = true, Visible = false })
+
+    return entry
+end
+
+function ESPLib:_destroy_entry(entry)
+    if not entry then return end
+    destroy_all(entry.objs)
+    for _, s in pairs(entry.skel) do
+        if s then pcall(function() s:Remove() end) end
+    end
+    entry.skel = {}
+    if entry.chams then
+        pcall(function() entry.chams:Destroy() end)
+        entry.chams = nil
+    end
+end
+
+function ESPLib:_ensure_skel(entry)
+    if not self.style.skeleton.enabled then return end
+    for i = 1, #skeleton_bones do
+        if not entry.skel[i] then
+            entry.skel[i] = new_drawing("Line", { Visible = false, Thickness = self.style.skeleton.thickness })
+        end
+    end
+end
+
+function ESPLib:_ensure_chams(entry, model, is_visible)
+    local ch = self.style.chams
+    if not ch.enabled then
+        if entry.chams then pcall(function() entry.chams.Enabled = false end) end
+        return
+    end
+    if not entry.chams or not entry.chams.Parent then
+        entry.chams = Instance.new("Highlight")
+        entry.chams.Name = "_hl"
+        entry.chams.Parent = self._container
+    end
+    entry.chams.Adornee = model
+    entry.chams.DepthMode = ch.depth_mode
+    local col = is_visible and ch.visible_color or ch.hidden_color
+    local trans = is_visible and ch.visible_transparency or ch.hidden_transparency
+    if ch.style == "Glow" then
+        entry.chams.FillTransparency = 1
+        entry.chams.OutlineColor = col
+        entry.chams.OutlineTransparency = trans
+    else
+        entry.chams.FillColor = col
+        entry.chams.FillTransparency = trans
+        entry.chams.OutlineColor = ch.outline_color
+        entry.chams.OutlineTransparency = ch.outline_transparency
+    end
+    entry.chams.Enabled = true
+end
+
+function ESPLib:_get_color(base_color, is_visible, is_hitscan)
+    if is_hitscan and self.style.hitscan_color then return self.style.hitscan_color end
+    if is_visible and self.style.visible_color then return self.style.visible_color end
+    return base_color
+end
+
+function ESPLib:_get_bounding(model)
+    local ok, cf, size = pcall(function() return model:GetBoundingBox() end)
+    if not ok or not size then return nil end
+    return cf, size
+end
+
+function ESPLib:_project_corners(cf, size)
+    local xs, ys, zs = size.X * 0.5, size.Y * 0.5, size.Z * 0.5
+    local pts = {
+        cf * Vector3.new( xs,  ys,  zs),
+        cf * Vector3.new( xs,  ys, -zs),
+        cf * Vector3.new( xs, -ys,  zs),
+        cf * Vector3.new( xs, -ys, -zs),
+        cf * Vector3.new(-xs,  ys,  zs),
+        cf * Vector3.new(-xs,  ys, -zs),
+        cf * Vector3.new(-xs, -ys,  zs),
+        cf * Vector3.new(-xs, -ys, -zs),
+    }
+    local min_x, min_y, max_x, max_y = math.huge, math.huge, -math.huge, -math.huge
+    local any_front = false
+    for i = 1, 8 do
+        local sp, on = safe_wtvp(pts[i])
+        if not sp then return nil end
+        if sp.Z > 0 then any_front = true end
+        if sp.X < min_x then min_x = sp.X end
+        if sp.Y < min_y then min_y = sp.Y end
+        if sp.X > max_x then max_x = sp.X end
+        if sp.Y > max_y then max_y = sp.Y end
+    end
+    if not any_front then return nil end
+    return Vector2.new(min_x, min_y), Vector2.new(max_x - min_x, max_y - min_y)
+end
+
+local function lerp_color(c1, c2, t)
+    t = math.clamp(t, 0, 1)
+    return Color3.new(c1.R + (c2.R - c1.R) * t, c1.G + (c2.G - c1.G) * t, c1.B + (c2.B - c1.B) * t)
+end
+
+function ESPLib:_draw_hp(entry, pos, sz, hp, max_hp)
+    local hp_s = self.style.health
+    local hp_bar_bg = entry.objs.hp_bar_bg
+    local hp_bar    = entry.objs.hp_bar
+    local hp_text   = entry.objs.hp_text
+    if not hp_s.enabled then
+        hp_bar_bg.Visible = false
+        hp_bar.Visible = false
+        hp_text.Visible = false
+        return
+    end
+    local ratio = math.clamp(hp / math.max(max_hp, 1), 0, 1)
+    local x = pos.X - 6
+    local y_top = pos.Y
+    local y_bot = pos.Y + sz.Y
+    local y_cur = y_bot - (y_bot - y_top) * ratio
+    hp_bar_bg.From = Vector2.new(x, y_top)
+    hp_bar_bg.To = Vector2.new(x, y_bot)
+    hp_bar_bg.Thickness = hp_s.thickness + 2
+    hp_bar_bg.Color = hp_s.outline_color
+    hp_bar_bg.Transparency = 1
+    hp_bar_bg.Visible = true
+
+    hp_bar.From = Vector2.new(x, y_cur)
+    hp_bar.To = Vector2.new(x, y_bot)
+    hp_bar.Thickness = hp_s.thickness
+    if hp_s.gradient then
+        hp_bar.Color = lerp_color(hp_s.color_low, hp_s.color_full, ratio)
+    else
+        hp_bar.Color = hp_s.color_full
+    end
+    hp_bar.Transparency = 1
+    hp_bar.Visible = true
+
+    if hp_s.show_text then
+        hp_text.Text = tostring(math.floor(hp + 0.5))
+        hp_text.Position = Vector2.new(x - 4, y_cur - hp_s.text_size * 0.5)
+        hp_text.Size = hp_s.text_size
+        hp_text.Font = hp_s.text_font
+        hp_text.Color = hp_bar.Color
+        hp_text.Outline = true
+        hp_text.OutlineColor = hp_s.outline_color
+        hp_text.Visible = true
+    else
+        hp_text.Visible = false
+    end
+end
+
+function ESPLib:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible)
+    local list = {}
+    if self.style.name.enabled then
+        local nm = entry.is_npc and (model.Name or "AI") or entry.subject.Name
+        table.insert(list, { text = nm, s = self.style.name })
+    end
+    if self.style.displayname.enabled and not entry.is_npc then
+        local dn = entry.subject.DisplayName
+        if dn and dn ~= entry.subject.Name then
+            table.insert(list, { text = dn, s = self.style.displayname })
+        end
+    end
+
+    local top_y = pos.Y - 2
+    for i = 1, #list do
+        local item = list[i]
+        local d = i == 1 and entry.objs.name or entry.objs.displayname
+        top_y = top_y - item.s.size - 1
+        d.Position = Vector2.new(pos.X + sz.X * 0.5, top_y)
+        d.Text = item.text
+        d.Size = item.s.size
+        d.Font = item.s.font
+        d.Color = self:_get_color(item.s.color, is_visible, false)
+        d.Outline = item.s.outline
+        d.OutlineColor = item.s.outline_color
+        d.Visible = true
+    end
+
+    if #list < 2 and self.style.displayname.enabled then
+        entry.objs.displayname.Visible = false
+    end
+    if not self.style.name.enabled then entry.objs.name.Visible = false end
+
+    local bot_y = pos.Y + sz.Y + 2
+    if self.style.distance.enabled then
+        local d = entry.objs.distance
+        d.Position = Vector2.new(pos.X + sz.X * 0.5, bot_y)
+        d.Text = string.format("%.0f%s", dist, self.style.distance.suffix or "m")
+        d.Size = self.style.distance.size
+        d.Font = self.style.distance.font
+        d.Color = self.style.distance.color
+        d.Outline = self.style.distance.outline
+        d.OutlineColor = self.style.distance.outline_color
+        d.Visible = true
+        bot_y = bot_y + self.style.distance.size + 1
+    else
+        entry.objs.distance.Visible = false
+    end
+
+    if self.style.weapon.enabled and self._weapon_getter then
+        local ok, wname = pcall(self._weapon_getter, entry.subject, model)
+        if ok and type(wname) == "string" and wname ~= "" then
+            local d = entry.objs.weapon
+            d.Position = Vector2.new(pos.X + sz.X * 0.5, bot_y)
+            d.Text = wname
+            d.Size = self.style.weapon.size
+            d.Font = self.style.weapon.font
+            d.Color = self.style.weapon.color
+            d.Outline = self.style.weapon.outline
+            d.OutlineColor = self.style.weapon.outline_color
+            d.Visible = true
+        else
+            entry.objs.weapon.Visible = false
+        end
+    else
+        entry.objs.weapon.Visible = false
+    end
+end
+
+function ESPLib:_draw_box(entry, pos, sz, is_visible)
+    if self.style.box.enabled then
+        local b = entry.objs.box
+        b.Position = pos
+        b.Size = sz
+        b.Thickness = self.style.box.thickness
+        b.Color = self:_get_color(self.style.box.color, is_visible, false)
+        b.Transparency = self.style.box.transparency
+        b.Visible = true
+    else
+        entry.objs.box.Visible = false
+    end
+    if self.style.box_outline.enabled then
+        local o = entry.objs.box_outline
+        o.Position = pos
+        o.Size = sz
+        o.Thickness = self.style.box_outline.thickness
+        o.Color = self.style.box_outline.color
+        o.Transparency = self.style.box_outline.transparency
+        o.Visible = true
+    else
+        entry.objs.box_outline.Visible = false
+    end
+    if self.style.box_fill.enabled then
+        local f = entry.objs.box_fill
+        f.Position = pos
+        f.Size = sz
+        f.Color = self.style.box_fill.color
+        f.Transparency = self.style.box_fill.transparency
+        f.Visible = true
+    else
+        entry.objs.box_fill.Visible = false
+    end
+end
+
+function ESPLib:_draw_skeleton(entry, model)
+    if not self.style.skeleton.enabled then
+        for _, s in pairs(entry.skel) do if s then s.Visible = false end end
+        return
+    end
+    self:_ensure_skel(entry)
+    for i, bone in ipairs(skeleton_bones) do
+        local a = model:FindFirstChild(bone[1])
+        local b = model:FindFirstChild(bone[2])
+        local ln = entry.skel[i]
+        if a and b and ln then
+            local sa, oa = safe_wtvp(a.Position)
+            local sb, ob = safe_wtvp(b.Position)
+            if sa and sb and sa.Z > 0 and sb.Z > 0 then
+                ln.From = Vector2.new(sa.X, sa.Y)
+                ln.To = Vector2.new(sb.X, sb.Y)
+                ln.Thickness = self.style.skeleton.thickness
+                ln.Color = self.style.skeleton.color
+                ln.Visible = true
+            else
+                ln.Visible = false
+            end
+        elseif ln then
+            ln.Visible = false
+        end
+    end
+end
+
+function ESPLib:_draw_arrow(entry, model)
+    local ar_s = self.style.off_screen_arrow
+    local arrow = entry.objs.arrow
+    if not ar_s.enabled then arrow.Visible = false return end
+    local hrp = model:FindFirstChild("HumanoidRootPart")
+    if not hrp then arrow.Visible = false return end
+    local sp, on = safe_wtvp(hrp.Position)
+    if not sp or (on and sp.Z > 0) then arrow.Visible = false return end
+
+    local vs = Camera.ViewportSize
+    local cx, cy = vs.X * 0.5, vs.Y * 0.5
+    local dx, dy = sp.X - cx, sp.Y - cy
+    if sp.Z < 0 then dx, dy = -dx, -dy end
+    local mag = math.sqrt(dx * dx + dy * dy)
+    if mag < 1 then arrow.Visible = false return end
+    local nx, ny = dx / mag, dy / mag
+    local px, py = cx + nx * ar_s.radius, cy + ny * ar_s.radius
+    local perp_x, perp_y = -ny, nx
+    local size = ar_s.size
+
+    arrow.PointA = Vector2.new(px + nx * size, py + ny * size)
+    arrow.PointB = Vector2.new(px - nx * size * 0.5 + perp_x * size * 0.5, py - ny * size * 0.5 + perp_y * size * 0.5)
+    arrow.PointC = Vector2.new(px - nx * size * 0.5 - perp_x * size * 0.5, py - ny * size * 0.5 - perp_y * size * 0.5)
+    arrow.Color = ar_s.color
+    arrow.Transparency = 1
+    arrow.Visible = true
+end
+
+function ESPLib:_hide_entry(entry)
+    set_vis_all(entry.objs, false)
+    for _, s in pairs(entry.skel) do if s then s.Visible = false end end
+    if entry.chams then pcall(function() entry.chams.Enabled = false end) end
+end
+
+function ESPLib:_should_render_this_frame(entry, dist, now)
+    if not self.style.distance_based_fps then return true end
+    if dist < self.style.dist_thresh_stud then return true end
+    local period = 1 / math.max(self.style.dist_low_hz, 1)
+    local last = self._last_dist_frame[entry] or 0
+    if now - last >= period then
+        self._last_dist_frame[entry] = now
+        return true
+    end
+    return false
+end
+
+function ESPLib:_update_entry(entry, now)
+    if not self.style.enabled then self:_hide_entry(entry) return end
+    local subject = entry.subject
+    if not entry.is_npc and (not subject or not subject.Parent) then
+        self:_destroy_entry(entry)
+        self._entries[subject] = nil
+        return
+    end
+    local model = self:_get_model(subject, entry.is_npc)
+    if not model or not model.Parent then self:_hide_entry(entry) return end
+    if model ~= entry._last_char then
+        entry._last_char = model
+        if entry.chams then pcall(function() entry.chams:Destroy() end) entry.chams = nil end
+    end
+    local ok_target, hum, hrp = is_valid_target(model)
+    if not ok_target then self:_hide_entry(entry) return end
+
+    local hrp_pos = hrp.Position
+    local dist = 0
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        dist = (LocalPlayer.Character.HumanoidRootPart.Position - hrp_pos).Magnitude
+    end
+    if dist > self.style.max_distance then
+        self:_hide_entry(entry)
+        self:_draw_arrow(entry, model)
+        return
+    end
+
+    if not self:_should_render_this_frame(entry, dist, now) then
+        return
+    end
+
+    local cf, size = self:_get_bounding(model)
+    if not cf then
+        self:_hide_entry(entry)
+        self:_draw_arrow(entry, model)
+        return
+    end
+    local pos, sz = self:_project_corners(cf, size)
+    if not pos then
+        self:_hide_entry(entry)
+        self:_draw_arrow(entry, model)
+        return
+    end
+
+    entry.objs.arrow.Visible = false
+
+    local is_visible = false
+    if self._visible_check_fn then
+        local ok, vis = pcall(self._visible_check_fn, entry.subject, model, hrp_pos)
+        if ok then is_visible = vis == true end
+    end
+    local is_hitscan = false
+    if self._hitscan_check_fn then
+        local ok, hs = pcall(self._hitscan_check_fn, entry.subject, model, hrp_pos)
+        if ok then is_hitscan = hs == true end
+    end
+
+    self:_ensure_chams(entry, model, is_visible)
+    self:_draw_box(entry, pos, sz, is_visible)
+    self:_draw_hp(entry, pos, sz, hum.Health, hum.MaxHealth)
+    self:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible)
+    self:_draw_skeleton(entry, model)
+end
+
+function ESPLib:Add(subject, is_npc)
+    if not subject then return end
+    if self._entries[subject] then return self._entries[subject] end
+    if not self:_should_track(subject, is_npc) then return end
+    local entry = self:_create_entry(subject, is_npc)
+    self._entries[subject] = entry
+    return entry
+end
+
+function ESPLib:Remove(subject)
+    local entry = self._entries[subject]
+    if not entry then return end
+    self:_destroy_entry(entry)
+    self._entries[subject] = nil
+end
+
+function ESPLib:GetEntry(subject) return self._entries[subject] end
+
+function ESPLib:UpdateStyle(patch)
+    if not patch then return end
+    deep_merge(self.style, patch)
+    for _, e in pairs(self._entries) do
+        e._last_char = nil
+    end
+end
+
+function ESPLib:Set(path, value)
+    local parts = {}
+    for p in string.gmatch(path, "[^%.]+") do table.insert(parts, p) end
+    local node = self.style
+    for i = 1, #parts - 1 do
+        if type(node[parts[i]]) ~= "table" then return end
+        node = node[parts[i]]
+    end
+    node[parts[#parts]] = value
+end
+
+function ESPLib:SetLootRoot(fn) self._loot_root_getter = fn end
+function ESPLib:SetLootWorth(fn) self._loot_worth_getter = fn end
+
+function ESPLib:_scan_loot(now)
+    local l = self.style.loot
+    if not l.enabled then
+        for inst, e in pairs(self._loot_entries) do
+            if e.text then pcall(function() e.text.Visible = false end) end
+        end
+        return
+    end
+    if now - self._last_loot_scan < 0.5 then return end
+    self._last_loot_scan = now
+    local root
+    if self._loot_root_getter then
+        local ok, r = pcall(self._loot_root_getter)
+        if ok then root = r end
+    else
+        root = Workspace:FindFirstChild("Items") or Workspace:FindFirstChild("Drops") or Workspace:FindFirstChild("Loot")
+    end
+    if not root then return end
+    local seen = {}
+    for _, inst in ipairs(root:GetChildren()) do
+        if inst:IsA("Model") or inst:IsA("BasePart") then
+            seen[inst] = true
+        end
+    end
+    for inst, e in pairs(self._loot_entries) do
+        if not seen[inst] then
+            if e.text then pcall(function() e.text:Remove() end) end
+            self._loot_entries[inst] = nil
+        end
+    end
+    for inst in pairs(seen) do
+        if not self._loot_entries[inst] then
+            local t = new_drawing("Text", {
+                Center = true, Visible = false,
+                Size = l.text_size, Font = l.text_font,
+                Color = l.color, Outline = l.outline, OutlineColor = l.outline_color,
+                Text = inst.Name,
+            })
+            self._loot_entries[inst] = { text = t, inst = inst, name = inst.Name, worth = 0 }
+        end
+    end
+end
+
+function ESPLib:_render_loot()
+    local l = self.style.loot
+    if not l.enabled then return end
+    local lp_pos
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        lp_pos = LocalPlayer.Character.HumanoidRootPart.Position
+    end
+    for inst, e in pairs(self._loot_entries) do
+        if not e.text then continue end
+        local part
+        if inst:IsA("Model") then
+            part = inst.PrimaryPart or inst:FindFirstChildWhichIsA("BasePart")
+        else
+            part = inst
+        end
+        if not part or not part.Parent then
+            e.text.Visible = false
+            continue
+        end
+        local dist = lp_pos and (part.Position - lp_pos).Magnitude or 0
+        if dist > l.max_distance then
+            e.text.Visible = false
+            continue
+        end
+        if self._loot_worth_getter then
+            local ok, w = pcall(self._loot_worth_getter, inst)
+            if ok then e.worth = tonumber(w) or 0 end
+        end
+        if l.min_worth > 0 and e.worth < l.min_worth then
+            e.text.Visible = false
+            continue
+        end
+        local sp, on = safe_wtvp(part.Position)
+        if not on or not sp then
+            e.text.Visible = false
+            continue
+        end
+        local txt = e.name
+        if l.show_distance then txt = txt .. " [" .. math.floor(dist) .. "m]" end
+        if e.worth > 0 then txt = txt .. " $" .. e.worth end
+        e.text.Text = txt
+        e.text.Color = l.color
+        e.text.Position = Vector2.new(sp.X, sp.Y)
+        e.text.Visible = true
+    end
+end
+
+function ESPLib:_update_trails(now)
+    local tr = self.style.trail
+    if not tr.enabled then
+        for k, td in pairs(self._trail_data) do
+            for _, ln in ipairs(td.lines) do
+                if ln then pcall(function() ln.Visible = false end) end
+            end
+        end
+        return
+    end
+    for subject, entry in pairs(self._entries) do
+        local model = self:_get_model(subject, entry.is_npc)
+        if not model then continue end
+        local ok, hum, hrp = is_valid_target(model)
+        if not ok then continue end
+        local pos = hrp.Position
+        local td = self._trail_data[subject]
+        if not td then
+            td = { points = {}, lines = {} }
+            self._trail_data[subject] = td
+        end
+        table.insert(td.points, { pos = pos, t = now })
+        while #td.points > tr.max_segments do table.remove(td.points, 1) end
+        while td.points[1] and (now - td.points[1].t) > tr.segment_life do
+            table.remove(td.points, 1)
+        end
+        while #td.lines < #td.points - 1 do
+            local ln = new_drawing("Line", { Visible = false, Thickness = tr.thickness, Color = tr.color, Transparency = 1 - tr.transparency })
+            table.insert(td.lines, ln)
+        end
+        while #td.lines > #td.points - 1 do
+            local ln = table.remove(td.lines)
+            if ln then pcall(function() ln:Remove() end) end
+        end
+        for i = 1, #td.points - 1 do
+            local p1 = td.points[i].pos
+            local p2 = td.points[i + 1].pos
+            local sp1, on1 = safe_wtvp(p1)
+            local sp2, on2 = safe_wtvp(p2)
+            local ln = td.lines[i]
+            if not ln then continue end
+            if on1 and on2 and sp1 and sp2 then
+                ln.From = Vector2.new(sp1.X, sp1.Y)
+                ln.To = Vector2.new(sp2.X, sp2.Y)
+                ln.Color = tr.color
+                ln.Thickness = tr.thickness
+                ln.Transparency = 1 - tr.transparency
+                ln.Visible = true
+            else
+                ln.Visible = false
+            end
+        end
+    end
+    for subject, td in pairs(self._trail_data) do
+        if not self._entries[subject] then
+            for _, ln in ipairs(td.lines) do
+                if ln then pcall(function() ln:Remove() end) end
+            end
+            self._trail_data[subject] = nil
+        end
+    end
+end
+
+function ESPLib:Start()
+    if self._running then return end
+    self._running = true
+    local plr_added = Players.PlayerAdded:Connect(function(p) self:Add(p, false) end)
+    local plr_rem = Players.PlayerRemoving:Connect(function(p) self:Remove(p) end)
+    table.insert(self._connections, plr_added)
+    table.insert(self._connections, plr_rem)
+
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then self:Add(p, false) end
+    end
+
+    local ai_folder = Workspace:FindFirstChild("AiZones") or Workspace:FindFirstChild("AI")
+    if ai_folder then
+        for _, m in ipairs(ai_folder:GetDescendants()) do
+            if m:IsA("Model") and m:FindFirstChildOfClass("Humanoid") then
+                self:Add(m, true)
+            end
+        end
+        local ai_added = ai_folder.DescendantAdded:Connect(function(m)
+            if m:IsA("Model") and m:FindFirstChildOfClass("Humanoid") then
+                self:Add(m, true)
+            end
+        end)
+        local ai_rem = ai_folder.DescendantRemoving:Connect(function(m)
+            if self._entries[m] then self:Remove(m) end
+        end)
+        table.insert(self._connections, ai_added)
+        table.insert(self._connections, ai_rem)
+    end
+
+    local rs = RunService.RenderStepped:Connect(function()
+        local now = tick()
+        local period = 1 / math.max(self.style.fps_cap, 1)
+        if now - self._last_frame < period then return end
+        self._last_frame = now
+        for _, entry in pairs(self._entries) do
+            local ok, err = pcall(self._update_entry, self, entry, now)
+            if not ok then
+                self:_hide_entry(entry)
+            end
+        end
+        pcall(self._scan_loot, self, now)
+        pcall(self._render_loot, self)
+        pcall(self._update_trails, self, now)
+    end)
+    table.insert(self._connections, rs)
+end
+
+function ESPLib:Stop()
+    self._running = false
+    for _, c in ipairs(self._connections) do
+        pcall(function() c:Disconnect() end)
+    end
+    self._connections = {}
+    for subject, e in pairs(self._entries) do
+        self:_destroy_entry(e)
+        self._entries[subject] = nil
+    end
+    if self._container then pcall(function() self._container:Destroy() end) end
+    self._container = Instance.new("Folder")
+    self._container.Name = "_hl_c"
+    self._container.Parent = Workspace
+    if self._loot_entries then
+        for k, e in pairs(self._loot_entries) do
+            if e.text then pcall(function() e.text:Remove() end) end
+            self._loot_entries[k] = nil
+        end
+    end
+    if self._trail_data then
+        for k, td in pairs(self._trail_data) do
+            for _, ln in ipairs(td.lines) do
+                if ln then pcall(function() ln:Remove() end) end
+            end
+            self._trail_data[k] = nil
+        end
+    end
+end
+
+return ESPLib
