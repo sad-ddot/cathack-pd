@@ -834,11 +834,15 @@ function esp:_draw_weapon_icon(entry, pos, sz, model, alpha)
     end
 
     local asset
+    local registered = false
     if self._weapon_icon_getter then
-        local ok, r = pcall(self._weapon_icon_getter, key)
-        if ok and r then asset = r end
+        local ok, a, reg = pcall(self._weapon_icon_getter, key)
+        if ok then
+            if a then asset = a end
+            if reg then registered = true end
+        end
     end
-    if not asset and self._weapon_icon_fallback then
+    if not asset and not registered and self._weapon_icon_fallback then
         local ok, r = pcall(self._weapon_icon_fallback, key, entry.subject, model)
         if ok and r then asset = r end
     end
