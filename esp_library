@@ -65,11 +65,11 @@ local DEFAULT_STYLE = {
     box_outline = { enabled = true, thickness = 3, color = Color3.fromRGB(0,0,0), transparency = 1 },
     box_fill = { enabled = false, color = Color3.fromRGB(0,0,0), transparency = 0.35 },
 
-    name = { enabled = true, size = 13, font = 2, color = Color3.fromRGB(255,255,255), outline = true, outline_color = Color3.fromRGB(0,0,0) },
-    displayname = { enabled = false, size = 12, font = 2, color = Color3.fromRGB(200,200,200), outline = true, outline_color = Color3.fromRGB(0,0,0) },
-    distance = { enabled = true, size = 12, font = 2, color = Color3.fromRGB(200,200,200), outline = true, outline_color = Color3.fromRGB(0,0,0), suffix = "m" },
-    weapon = { enabled = false, size = 12, font = 2, color = Color3.fromRGB(200,200,200), outline = true, outline_color = Color3.fromRGB(0,0,0) },
-    weapon_icon = { enabled = false, size = 22, position = "below_box", placeholder_text = "?" },
+    name = { enabled = true, size = 13, font = 2, color = Color3.fromRGB(255,255,255), outline = true, outline_color = Color3.fromRGB(0,0,0), slot = "top-center" },
+    displayname = { enabled = false, size = 12, font = 2, color = Color3.fromRGB(200,200,200), outline = true, outline_color = Color3.fromRGB(0,0,0), slot = "top-center" },
+    distance = { enabled = true, size = 12, font = 2, color = Color3.fromRGB(200,200,200), outline = true, outline_color = Color3.fromRGB(0,0,0), suffix = "m", slot = "bottom-center" },
+    weapon = { enabled = false, size = 12, font = 2, color = Color3.fromRGB(200,200,200), outline = true, outline_color = Color3.fromRGB(0,0,0), slot = "bottom-center" },
+    weapon_icon = { enabled = false, size = 22, slot = "bottom-center" },
 
     health = {
         enabled = true,
@@ -150,6 +150,7 @@ function esp.new(config)
     self._hitscan_check_fn = nil
     self._weapon_getter = nil
     self._weapon_icon_getter = nil
+    self._weapon_icon_fallback = nil
     self._loot_root_getter = nil
     self._loot_worth_getter = nil
     self._last_loot_scan = 0
@@ -172,6 +173,7 @@ function esp:SetVisibleCheck(fn) self._visible_check_fn = fn end
 function esp:SetHitscanCheck(fn) self._hitscan_check_fn = fn end
 function esp:SetWeaponGetter(fn) self._weapon_getter = fn end
 function esp:SetWeaponIconGetter(fn) self._weapon_icon_getter = fn end
+function esp:SetWeaponIconFallback(fn) self._weapon_icon_fallback = fn end
 function esp:SetLootRoot(fn) self._loot_root_getter = fn end
 function esp:SetLootWorth(fn) self._loot_worth_getter = fn end
 
@@ -236,22 +238,9 @@ function esp:_create_entry(subject, is_npc)
     icon_img.ScaleType = Enum.ScaleType.Fit
     icon_img.Visible = false
     icon_img.Parent = icon_holder
-    local icon_placeholder = Instance.new("TextLabel")
-    icon_placeholder.Name = "ph"
-    icon_placeholder.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    icon_placeholder.BackgroundTransparency = 0.35
-    icon_placeholder.BorderSizePixel = 0
-    icon_placeholder.Size = UDim2.new(1, 0, 1, 0)
-    icon_placeholder.Text = "?"
-    icon_placeholder.TextColor3 = Color3.fromRGB(255, 255, 255)
-    icon_placeholder.Font = Enum.Font.GothamBold
-    icon_placeholder.TextScaled = true
-    icon_placeholder.Visible = true
-    icon_placeholder.Parent = icon_holder
     entry.icon = {
         holder = icon_holder,
         img = icon_img,
-        placeholder = icon_placeholder,
         current_key = nil,
     }
     return entry
@@ -517,10 +506,25 @@ function esp:_draw_hp(entry, pos, sz, hp, max_hp, alpha)
     end
 end
 
+local SLOTS = {
+    ["top-left"] = true, ["top-center"] = true, ["top-right"] = true,
+    ["bottom-left"] = true, ["bottom-center"] = true, ["bottom-right"] = true,
+    ["left-top"] = true, ["left-bottom"] = true,
+    ["right-top"] = true, ["right-bottom"] = true,
+}
+local function valid_slot(s, default)
+    if type(s) == "string" and SLOTS[s] then return s end
+    return default or "top-center"
+end
+
 function esp:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible, alpha)
-    local stack_top = {}
-    local stack_bot = {}
     local trans = alpha or 1
+    local groups = {}
+    local function push(slot_id, obj)
+        groups[slot_id] = groups[slot_id] or {}
+        local g = groups[slot_id]
+        g[#g + 1] = obj
+    end
 
     if self.style.name.enabled then
         local n = entry.objs.name
@@ -531,7 +535,7 @@ function esp:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible, alph
         n.Outline = self.style.name.outline
         n.OutlineColor = self.style.name.outline_color
         n.Transparency = trans
-        stack_top[#stack_top + 1] = n
+        push(valid_slot(self.style.name.slot, "top-center"), { kind = "text", d = n, w = 0, h = n.Size })
     else
         entry.objs.name.Visible = false
     end
@@ -545,7 +549,7 @@ function esp:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible, alph
         d.Outline = self.style.displayname.outline
         d.OutlineColor = self.style.displayname.outline_color
         d.Transparency = trans
-        stack_top[#stack_top + 1] = d
+        push(valid_slot(self.style.displayname.slot, "top-center"), { kind = "text", d = d, w = 0, h = d.Size })
     else
         entry.objs.displayname.Visible = false
     end
@@ -559,7 +563,7 @@ function esp:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible, alph
         ds.Outline = self.style.distance.outline
         ds.OutlineColor = self.style.distance.outline_color
         ds.Transparency = trans
-        stack_bot[#stack_bot + 1] = ds
+        push(valid_slot(self.style.distance.slot, "bottom-center"), { kind = "text", d = ds, w = 0, h = ds.Size })
     else
         entry.objs.distance.Visible = false
     end
@@ -578,24 +582,117 @@ function esp:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible, alph
         w.Outline = self.style.weapon.outline
         w.OutlineColor = self.style.weapon.outline_color
         w.Transparency = trans
-        if wname ~= "" then stack_bot[#stack_bot + 1] = w else w.Visible = false end
+        if wname ~= "" then
+            push(valid_slot(self.style.weapon.slot, "bottom-center"), { kind = "text", d = w, w = 0, h = w.Size })
+        else
+            w.Visible = false
+        end
     else
         entry.objs.weapon.Visible = false
     end
 
+    self:_layout_slots(pos, sz, groups)
+end
+
+function esp:_layout_slots(pos, sz, groups)
+    local left = pos.X
+    local right = pos.X + sz.X
+    local top = pos.Y
+    local bot = pos.Y + sz.Y
     local center_x = pos.X + sz.X * 0.5
-    local y = pos.Y - 2
-    for i = #stack_top, 1, -1 do
-        local obj = stack_top[i]
-        y = y - obj.Size - 1
-        obj.Position = Vector2.new(center_x, y)
-        obj.Visible = true
+    local center_y = pos.Y + sz.Y * 0.5
+    local pad = 2
+
+    local function place_vertical(items, base_x, base_y, dir, align_x)
+        local y = base_y + (dir < 0 and -pad or pad)
+        if dir < 0 then
+            for i = #items, 1, -1 do
+                local it = items[i]
+                y = y - it.h - 1
+                if it.kind == "text" then
+                    if align_x == "left" then
+                        it.d.Center = false
+                        it.d.Position = Vector2.new(base_x, y)
+                    elseif align_x == "right" then
+                        local w = it.d.TextBounds and it.d.TextBounds.X or 0
+                        it.d.Center = false
+                        it.d.Position = Vector2.new(base_x - w, y)
+                    else
+                        it.d.Center = true
+                        it.d.Position = Vector2.new(base_x, y)
+                    end
+                    it.d.Visible = true
+                elseif it.kind == "icon" then
+                    it.set_pos(base_x, y + it.h * 0.5, align_x)
+                end
+            end
+        else
+            for _, it in ipairs(items) do
+                if it.kind == "text" then
+                    if align_x == "left" then
+                        it.d.Center = false
+                        it.d.Position = Vector2.new(base_x, y)
+                    elseif align_x == "right" then
+                        local w = it.d.TextBounds and it.d.TextBounds.X or 0
+                        it.d.Center = false
+                        it.d.Position = Vector2.new(base_x - w, y)
+                    else
+                        it.d.Center = true
+                        it.d.Position = Vector2.new(base_x, y)
+                    end
+                    it.d.Visible = true
+                elseif it.kind == "icon" then
+                    it.set_pos(base_x, y + it.h * 0.5, align_x)
+                end
+                y = y + it.h + 1
+            end
+        end
     end
-    local y2 = pos.Y + sz.Y + 2
-    for _, obj in ipairs(stack_bot) do
-        obj.Position = Vector2.new(center_x, y2)
-        obj.Visible = true
-        y2 = y2 + obj.Size + 1
+
+    local function place_side_stack(items, base_x, base_y, align_x)
+        local total_h = 0
+        for _, it in ipairs(items) do total_h = total_h + it.h + 1 end
+        local y = base_y - total_h * 0.5
+        for _, it in ipairs(items) do
+            if it.kind == "text" then
+                if align_x == "left" then
+                    it.d.Center = false
+                    it.d.Position = Vector2.new(base_x, y)
+                else
+                    local w = it.d.TextBounds and it.d.TextBounds.X or 0
+                    it.d.Center = false
+                    it.d.Position = Vector2.new(base_x - w, y)
+                end
+                it.d.Visible = true
+            elseif it.kind == "icon" then
+                it.set_pos(base_x, y + it.h * 0.5, align_x)
+            end
+            y = y + it.h + 1
+        end
+    end
+
+    for slot_id, items in pairs(groups) do
+        if slot_id == "top-left" then
+            place_vertical(items, left, top, -1, "left")
+        elseif slot_id == "top-center" then
+            place_vertical(items, center_x, top, -1, "center")
+        elseif slot_id == "top-right" then
+            place_vertical(items, right, top, -1, "right")
+        elseif slot_id == "bottom-left" then
+            place_vertical(items, left, bot, 1, "left")
+        elseif slot_id == "bottom-center" then
+            place_vertical(items, center_x, bot, 1, "center")
+        elseif slot_id == "bottom-right" then
+            place_vertical(items, right, bot, 1, "right")
+        elseif slot_id == "left-top" then
+            place_side_stack(items, left - 6, top + sz.Y * 0.25, "right")
+        elseif slot_id == "left-bottom" then
+            place_side_stack(items, left - 6, top + sz.Y * 0.75, "right")
+        elseif slot_id == "right-top" then
+            place_side_stack(items, right + 6, top + sz.Y * 0.25, "left")
+        elseif slot_id == "right-bottom" then
+            place_side_stack(items, right + 6, top + sz.Y * 0.75, "left")
+        end
     end
 end
 
@@ -722,6 +819,7 @@ function esp:_draw_weapon_icon(entry, pos, sz, model, alpha)
     local cfg = self.style.weapon_icon
     if not cfg.enabled then
         ic.holder.Visible = false
+        ic.current_key = nil
         return
     end
     local key
@@ -740,19 +838,20 @@ function esp:_draw_weapon_icon(entry, pos, sz, model, alpha)
         local ok, r = pcall(self._weapon_icon_getter, key)
         if ok and r then asset = r end
     end
+    if not asset and self._weapon_icon_fallback then
+        local ok, r = pcall(self._weapon_icon_fallback, key, entry.subject, model)
+        if ok and r then asset = r end
+    end
 
-    if key ~= ic.current_key or (asset and ic.img.Image ~= asset) then
+    if not asset then
+        ic.holder.Visible = false
+        return
+    end
+
+    if key ~= ic.current_key or ic.img.Image ~= asset then
         ic.current_key = key
-        if asset then
-            ic.img.Image = asset
-            ic.img.Visible = true
-            ic.placeholder.Visible = false
-        else
-            ic.img.Visible = false
-            ic.img.Image = ""
-            ic.placeholder.Visible = true
-            ic.placeholder.Text = cfg.placeholder_text or "?"
-        end
+        ic.img.Image = asset
+        ic.img.Visible = true
     end
 
     local a = alpha or 1
@@ -769,8 +868,6 @@ function esp:_draw_weapon_icon(entry, pos, sz, model, alpha)
     ic.holder.Position = UDim2.fromOffset(cx, y)
     ic.holder.Visible = true
     ic.img.ImageTransparency = 1 - a
-    ic.placeholder.BackgroundTransparency = math.min(1, 0.35 + (1 - a))
-    ic.placeholder.TextTransparency = 1 - a
 end
 
 function esp:_hide_entry(entry)
