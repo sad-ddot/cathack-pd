@@ -87,11 +87,9 @@ local DEFAULT_STYLE = {
 
     chams = {
         enabled = false,
-        style = "Glow",
         hidden_color = Color3.fromRGB(152, 188, 255),
         hidden_transparency = 0.5,
         visible_color = Color3.fromRGB(152, 188, 255),
-        visible_transparency = 0.5,
     },
 
     visible_color = nil,
@@ -223,15 +221,19 @@ function ESPLib:_ensure_skel(entry)
     end
 end
 
-local function color_multiply(c, factor)
-    return Color3.new(
-        math.min(c.R * factor, 1),
-        math.min(c.G * factor, 1),
-        math.min(c.B * factor, 1)
-    )
+function ESPLib:_refresh_body_parts(entry, model)
+    if entry._body_parts_char == model then return entry._body_parts end
+    local parts = {}
+    for _, name in ipairs(BODY_PARTS) do
+        local p = model:FindFirstChild(name)
+        if p and p:IsA("BasePart") then parts[#parts + 1] = p end
+    end
+    entry._body_parts = parts
+    entry._body_parts_char = model
+    return parts
 end
 
-function ESPLib:_apply_chams(entry, model, is_visible)
+function ESPLib:_apply_chams(entry, model)
     local ch = self.style.chams
     if not ch.enabled then
         for _, pair in pairs(entry.adornments) do
@@ -242,55 +244,63 @@ function ESPLib:_apply_chams(entry, model, is_visible)
         entry.adornments = {}
         return
     end
-    local color = is_visible and ch.visible_color or ch.hidden_color
-    local trans = is_visible and ch.visible_transparency or ch.hidden_transparency
-    local glow_color = color_multiply(color, 5)
+    local main_color = ch.hidden_color
+    local glow_color = ch.visible_color
+    local main_trans = ch.hidden_transparency
+    local glow_target = Color3.new(glow_color.R * 5, glow_color.G * 5, glow_color.B * 5)
     local seen = {}
+    local body_parts = self:_refresh_body_parts(entry, model)
 
-    for _, part_name in ipairs(BODY_PARTS) do
-        local part = model:FindFirstChild(part_name)
-        if part and part:IsA("BasePart") and part.Transparency < 1 then
+    for _, part in ipairs(body_parts) do
+        if part.Parent == model and part.Transparency < 1 then
             seen[part] = true
+            local is_head = (part.Name == "Head") or (part.Name == "FakeHead")
             local existing = entry.adornments[part]
             local glow_ad = existing and existing[1]
             local main_ad = existing and existing[2]
-            local is_head = (part.Name == "Head") or (part.Name == "FakeHead")
 
-            if ch.style == "Glow" then
-                if not (glow_ad and glow_ad.Parent) then
-                    glow_ad = Instance.new("BoxHandleAdornment")
-                    glow_ad.Name = "_g"
-                    glow_ad.AlwaysOnTop = true
-                    glow_ad.ZIndex = is_head and 10 or 9
-                    glow_ad.Adornee = part
-                    glow_ad.Size = part.Size + Vector3.new(0.03, 0.03, 0.03)
-                    glow_ad.Color3 = glow_color
-                    glow_ad.Transparency = -1
-                    pcall(function() glow_ad.Shading = Enum.AdornShading.XRayShaded end)
-                    glow_ad.Parent = part
-                else
-                    glow_ad.Color3 = glow_color
-                    glow_ad.Size = part.Size + Vector3.new(0.03, 0.03, 0.03)
+            if typeof(glow_ad) ~= "Instance" or glow_ad.Parent ~= part then
+                for _, child in ipairs(part:GetChildren()) do
+                    if child.Name == "_g" or child.Name == "_m" then child:Destroy() end
                 end
-                if main_ad and main_ad.Parent then main_ad:Destroy(); main_ad = nil end
-            else
-                if not (main_ad and main_ad.Parent) then
-                    main_ad = Instance.new("BoxHandleAdornment")
-                    main_ad.Name = "_m"
-                    main_ad.AlwaysOnTop = true
-                    main_ad.ZIndex = 10
-                    main_ad.Adornee = part
-                    main_ad.Size = part.Size + Vector3.new(0.02, 0.02, 0.02)
-                    main_ad.Color3 = color
-                    main_ad.Transparency = trans
-                    main_ad.Parent = part
-                else
-                    main_ad.Color3 = color
-                    main_ad.Transparency = trans
-                    main_ad.Size = part.Size + Vector3.new(0.02, 0.02, 0.02)
-                end
-                if glow_ad and glow_ad.Parent then glow_ad:Destroy(); glow_ad = nil end
+                glow_ad = Instance.new("BoxHandleAdornment")
+                glow_ad.Name = "_g"
+                glow_ad.AlwaysOnTop = true
+                glow_ad.ZIndex = is_head and 10 or 9
+                glow_ad.Adornee = part
+                glow_ad.Size = part.Size + Vector3.new(0.03, 0.03, 0.03)
+                glow_ad.Color3 = glow_target
+                glow_ad.Transparency = -1
+                pcall(function() glow_ad.Shading = Enum.AdornShading.XRayShaded end)
+                glow_ad.Parent = part
             end
+
+            if typeof(main_ad) ~= "Instance" or main_ad.Parent ~= part then
+                main_ad = Instance.new("BoxHandleAdornment")
+                main_ad.Name = "_m"
+                main_ad.AlwaysOnTop = true
+                main_ad.ZIndex = 10
+                main_ad.Adornee = part
+                main_ad.Size = part.Size + Vector3.new(0.02, 0.02, 0.02)
+                main_ad.Color3 = main_color
+                main_ad.Transparency = main_trans
+                main_ad.Parent = part
+            end
+
+            glow_ad.Adornee = part
+            glow_ad.AlwaysOnTop = true
+            glow_ad.ZIndex = is_head and 10 or 9
+            glow_ad.Color3 = glow_target
+            glow_ad.Transparency = -1
+            glow_ad.Size = part.Size + Vector3.new(0.03, 0.03, 0.03)
+
+            main_ad.Adornee = part
+            main_ad.AlwaysOnTop = true
+            main_ad.ZIndex = 10
+            main_ad.Color3 = main_color
+            main_ad.Transparency = main_trans
+            main_ad.Size = part.Size + Vector3.new(0.02, 0.02, 0.02)
+
             entry.adornments[part] = { glow_ad, main_ad }
         end
     end
@@ -606,7 +616,7 @@ function ESPLib:_update_entry(entry)
         if ok3 then is_hitscan = hs == true end
     end
 
-    self:_apply_chams(entry, model, is_visible)
+    self:_apply_chams(entry, model)
     self:_draw_box(entry, pos, sz, is_visible)
     self:_draw_hp(entry, pos, sz, hum.Health, hum.MaxHealth)
     self:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible)
