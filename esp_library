@@ -69,6 +69,7 @@ local DEFAULT_STYLE = {
     displayname = { enabled = false, size = 12, font = 2, color = Color3.fromRGB(200,200,200), outline = true, outline_color = Color3.fromRGB(0,0,0) },
     distance = { enabled = true, size = 12, font = 2, color = Color3.fromRGB(200,200,200), outline = true, outline_color = Color3.fromRGB(0,0,0), suffix = "m" },
     weapon = { enabled = false, size = 12, font = 2, color = Color3.fromRGB(200,200,200), outline = true, outline_color = Color3.fromRGB(0,0,0) },
+    weapon_icon = { enabled = false, size = 22, position = "above_bar", placeholder_text = "?" },
 
     health = {
         enabled = true,
@@ -148,9 +149,20 @@ function esp.new(config)
     self._visible_check_fn = nil
     self._hitscan_check_fn = nil
     self._weapon_getter = nil
+    self._weapon_icon_getter = nil
     self._loot_root_getter = nil
     self._loot_worth_getter = nil
     self._last_loot_scan = 0
+
+    local gui_parent = (gethui and gethui()) or game:GetService("CoreGui")
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "_ei"
+    gui.IgnoreGuiInset = true
+    gui.ResetOnSpawn = false
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.DisplayOrder = 9998
+    gui.Parent = gui_parent
+    self._icon_gui = gui
 
     return self
 end
@@ -159,6 +171,7 @@ function esp:SetTargetFilter(fn) self._is_target_fn = fn end
 function esp:SetVisibleCheck(fn) self._visible_check_fn = fn end
 function esp:SetHitscanCheck(fn) self._hitscan_check_fn = fn end
 function esp:SetWeaponGetter(fn) self._weapon_getter = fn end
+function esp:SetWeaponIconGetter(fn) self._weapon_icon_getter = fn end
 function esp:SetLootRoot(fn) self._loot_root_getter = fn end
 function esp:SetLootWorth(fn) self._loot_worth_getter = fn end
 
@@ -206,6 +219,41 @@ function esp:_create_entry(subject, is_npc)
     for i = 1, HP_SEGMENTS do
         entry.hp_segments[i] = new_drawing("Line", { Visible = false, ZIndex = 3 })
     end
+
+    local icon_holder = Instance.new("Frame")
+    icon_holder.Name = "_ih"
+    icon_holder.BackgroundTransparency = 1
+    icon_holder.BorderSizePixel = 0
+    icon_holder.AnchorPoint = Vector2.new(0.5, 0.5)
+    icon_holder.Size = UDim2.fromOffset(22, 22)
+    icon_holder.Visible = false
+    icon_holder.Parent = self._icon_gui
+    local icon_img = Instance.new("ImageLabel")
+    icon_img.Name = "img"
+    icon_img.BackgroundTransparency = 1
+    icon_img.BorderSizePixel = 0
+    icon_img.Size = UDim2.new(1, 0, 1, 0)
+    icon_img.ScaleType = Enum.ScaleType.Fit
+    icon_img.Visible = false
+    icon_img.Parent = icon_holder
+    local icon_placeholder = Instance.new("TextLabel")
+    icon_placeholder.Name = "ph"
+    icon_placeholder.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    icon_placeholder.BackgroundTransparency = 0.35
+    icon_placeholder.BorderSizePixel = 0
+    icon_placeholder.Size = UDim2.new(1, 0, 1, 0)
+    icon_placeholder.Text = "?"
+    icon_placeholder.TextColor3 = Color3.fromRGB(255, 255, 255)
+    icon_placeholder.Font = Enum.Font.GothamBold
+    icon_placeholder.TextScaled = true
+    icon_placeholder.Visible = true
+    icon_placeholder.Parent = icon_holder
+    entry.icon = {
+        holder = icon_holder,
+        img = icon_img,
+        placeholder = icon_placeholder,
+        current_key = nil,
+    }
     return entry
 end
 
@@ -219,6 +267,10 @@ function esp:_destroy_entry(entry)
         if ln then ln:Remove() end
     end
     entry.hp_segments = {}
+    if entry.icon and entry.icon.holder then
+        entry.icon.holder:Destroy()
+        entry.icon = nil
+    end
     self:_clear_chams(entry)
 end
 
@@ -565,7 +617,7 @@ function esp:_draw_box(entry, pos, sz, is_visible, alpha)
     else
         entry.objs.box_fill.Visible = false
     end
-    if self.style.box_outline.enabled then
+    if self.style.box_outline.enabled and self.style.box.enabled then
         local o = entry.objs.box_outline
         o.Size = sz
         o.Position = pos
@@ -664,10 +716,66 @@ function esp:_draw_arrow(entry, model, dt)
     end
 end
 
+function esp:_draw_weapon_icon(entry, pos, sz, model, alpha)
+    local ic = entry.icon
+    if not ic then return end
+    local cfg = self.style.weapon_icon
+    if not cfg.enabled then
+        ic.holder.Visible = false
+        return
+    end
+    local a = alpha or 1
+    local key
+    if self._weapon_getter then
+        local ok, r = pcall(self._weapon_getter, entry.subject, model)
+        if ok and r and r ~= "" then key = tostring(r) end
+    end
+
+    local asset
+    if key and self._weapon_icon_getter then
+        local ok, r = pcall(self._weapon_icon_getter, key)
+        if ok then asset = r end
+    end
+
+    if key ~= ic.current_key then
+        ic.current_key = key
+        if asset then
+            ic.img.Image = asset
+            ic.img.Visible = true
+            ic.placeholder.Visible = false
+            ic.placeholder.Text = ""
+        else
+            ic.img.Visible = false
+            ic.img.Image = ""
+            ic.placeholder.Visible = true
+            ic.placeholder.Text = cfg.placeholder_text or "?"
+        end
+    end
+
+    local icon_size = cfg.size or 22
+    ic.holder.Size = UDim2.fromOffset(icon_size, icon_size)
+    local cx = pos.X + sz.X * 0.5
+    local y
+    local mode = cfg.position or "above_bar"
+    if mode == "above_bar" then
+        y = pos.Y - icon_size * 0.5 - 4
+    elseif mode == "below_name" then
+        y = pos.Y - icon_size * 0.5 - 4
+    else
+        y = pos.Y + sz.Y + icon_size * 0.5 + 4
+    end
+    ic.holder.Position = UDim2.fromOffset(cx, y)
+    ic.holder.Visible = true
+    ic.img.ImageTransparency = 1 - a
+    ic.placeholder.BackgroundTransparency = math.min(1, 0.35 + (1 - a))
+    ic.placeholder.TextTransparency = 1 - a
+end
+
 function esp:_hide_entry(entry)
     for _, obj in pairs(entry.objs) do obj.Visible = false end
     for _, ln in pairs(entry.skel_lines) do ln.Visible = false end
     for _, ln in pairs(entry.hp_segments) do ln.Visible = false end
+    if entry.icon and entry.icon.holder then entry.icon.holder.Visible = false end
     self:_clear_chams(entry)
 end
 
@@ -743,6 +851,7 @@ function esp:_update_entry(entry, dt)
     self:_draw_box(entry, pos, sz, is_visible, alpha)
     self:_draw_hp(entry, pos, sz, hum.Health, hum.MaxHealth, alpha)
     self:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible, alpha)
+    self:_draw_weapon_icon(entry, pos, sz, model, alpha)
     if alive then
         self:_draw_skeleton(entry, model, alpha)
     else
@@ -990,6 +1099,10 @@ function esp:Stop()
         end
     end
     self._trail_data = {}
+    if self._icon_gui then
+        self._icon_gui:Destroy()
+        self._icon_gui = nil
+    end
 end
 
 return esp
