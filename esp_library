@@ -244,22 +244,19 @@ end
 local function collect_body_parts(model)
     local out = {}
     local seen = {}
-    for _, name in ipairs(BODY_PARTS) do
-        local p = model:FindFirstChild(name, true)
-        if p and p:IsA("BasePart") and not seen[p] then
-            seen[p] = true
-            out[#out + 1] = p
+    local wanted = {}
+    for _, n in ipairs(BODY_PARTS) do wanted[n] = true end
+    for _, c in ipairs(model:GetChildren()) do
+        if c:IsA("BasePart") and wanted[c.Name] and not seen[c] then
+            seen[c] = true
+            out[#out + 1] = c
         end
     end
-    for _, d in ipairs(model:GetDescendants()) do
-        if d:IsA("BasePart") and not seen[d] and d.Name ~= "HumanoidRootPart" and d.Transparency < 1 then
-            local nm = d.Name
-            for _, bp in ipairs(BODY_PARTS) do
-                if nm == bp then
-                    seen[d] = true
-                    out[#out + 1] = d
-                    break
-                end
+    if #out < #BODY_PARTS then
+        for _, d in ipairs(model:GetDescendants()) do
+            if d:IsA("BasePart") and wanted[d.Name] and not seen[d] and d.Transparency < 1 then
+                seen[d] = true
+                out[#out + 1] = d
             end
         end
     end
@@ -395,7 +392,7 @@ end
 
 function esp:_draw_hp(entry, pos, sz, hp, max_hp, alpha)
     local h = self.style.health
-    if not h.enabled or max_hp <= 0 then
+    if not h.enabled or max_hp <= 0 or sz.Y < 4 then
         for _, ln in ipairs(entry.hp_segments) do ln.Visible = false end
         entry.objs.hp_outline.Visible = false
         entry.objs.hp_text.Visible = false
@@ -403,42 +400,41 @@ function esp:_draw_hp(entry, pos, sz, hp, max_hp, alpha)
     end
     local ratio = math.clamp(hp / max_hp, 0, 1)
     local bar_h = sz.Y
-    local x = pos.X - 4 - h.thickness
-    local top_y = pos.Y
-    local bot_y = pos.Y + bar_h
-    local fill_top_y = pos.Y + bar_h * (1 - ratio)
-    local trans = 1 - (alpha or 1)
+    local x = math.floor(pos.X - 4 - h.thickness * 0.5)
+    local top_y = math.floor(pos.Y)
+    local bot_y = math.floor(pos.Y + bar_h)
+    local fill_top_y = math.floor(pos.Y + bar_h * (1 - ratio))
+    local trans_a = alpha or 1
 
     local ob = entry.objs.hp_outline
     ob.From = Vector2.new(x, top_y - 1)
     ob.To = Vector2.new(x, bot_y + 1)
     ob.Thickness = h.thickness + h.outline_thickness * 2
     ob.Color = h.outline_color
-    ob.Transparency = 1 - (alpha or 1)
+    ob.Transparency = trans_a
     ob.Visible = true
 
-    local visible_top = math.max(fill_top_y, top_y)
-    local visible_h = math.max(bot_y - visible_top, 0)
-    for i = 1, HP_SEGMENTS do
+    local seg_count = HP_SEGMENTS
+    local seg_h = bar_h / seg_count
+    for i = 1, seg_count do
         local seg = entry.hp_segments[i]
-        if visible_h <= 0.5 then
+        local sy0 = top_y + math.floor(seg_h * (i - 1))
+        local sy1 = top_y + math.floor(seg_h * i)
+        if sy1 <= fill_top_y then
             seg.Visible = false
         else
-            local t0 = (i - 1) / HP_SEGMENTS
-            local t1 = i / HP_SEGMENTS
-            local sy0 = visible_top + visible_h * t0
-            local sy1 = visible_top + visible_h * t1
-            if sy1 - sy0 < 0.5 then
+            local draw_from = math.max(sy0, fill_top_y)
+            local draw_to = sy1
+            if draw_to - draw_from < 1 then
                 seg.Visible = false
             else
-                local color_t = (sy0 + sy1) * 0.5
-                local rel = (color_t - top_y) / bar_h
-                rel = math.clamp(rel, 0, 1)
-                seg.From = Vector2.new(x, sy0)
-                seg.To = Vector2.new(x, sy1 + 0.5)
+                local mid = (sy0 + sy1) * 0.5
+                local rel = math.clamp((mid - top_y) / bar_h, 0, 1)
+                seg.From = Vector2.new(x, draw_from)
+                seg.To = Vector2.new(x, draw_to + 1)
                 seg.Thickness = h.thickness
                 seg.Color = lerp_color(h.color_top, h.color_bot, rel)
-                seg.Transparency = 1 - (alpha or 1)
+                seg.Transparency = trans_a
                 seg.Visible = true
             end
         end
@@ -452,7 +448,7 @@ function esp:_draw_hp(entry, pos, sz, hp, max_hp, alpha)
         tx.Color = Color3.new(1,1,1)
         tx.Outline = true
         tx.OutlineColor = Color3.new(0,0,0)
-        tx.Transparency = alpha or 1
+        tx.Transparency = trans_a
         tx.Position = Vector2.new(x - 2, fill_top_y - h.text_size / 2)
         tx.Visible = true
     else
