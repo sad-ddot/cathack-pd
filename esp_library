@@ -241,22 +241,38 @@ function esp:_ensure_skel(entry)
     end
 end
 
+local function is_ignored_body_part(inst)
+    if not (inst and inst:IsA("BasePart")) then return true end
+    if inst.Name == "HumanoidRootPart" then return true end
+    if inst:GetAttribute("PDIgnoreChams") == true then return true end
+    local nm = string.lower(inst.Name or "")
+    if nm == "ignoreme" or nm == "pdserverpositionclone"
+        or nm == "facehitbox" or nm == "headtophitbox" then return true end
+    if nm:find("lagcham", 1, true) then return true end
+    if nm:find("fakecham", 1, true) then return true end
+    return false
+end
+
 local function collect_body_parts(model)
     local out = {}
-    for _, d in ipairs(model:GetDescendants()) do
-        if d:IsA("BasePart") and d.Name ~= "HumanoidRootPart" and d.Transparency < 1 then
-            out[#out + 1] = d
+    for _, child in ipairs(model:GetChildren()) do
+        if not is_ignored_body_part(child) then
+            out[#out + 1] = child
         end
     end
     return out
 end
 
 function esp:_refresh_body_parts(entry, model)
-    if entry._body_parts_char == model and entry._body_parts and #entry._body_parts > 0 then
-        return entry._body_parts
+    local now = tick()
+    local stale = (entry._body_parts_char ~= model)
+        or not entry._body_parts
+        or ((now - (entry._body_parts_scan or 0)) >= 0.5)
+    if stale then
+        entry._body_parts = collect_body_parts(model)
+        entry._body_parts_char = model
+        entry._body_parts_scan = now
     end
-    entry._body_parts = collect_body_parts(model)
-    entry._body_parts_char = model
     return entry._body_parts
 end
 
@@ -272,10 +288,6 @@ function esp:_apply_chams(entry, model)
     local glow_target = Color3.new(glow_color.R * 5, glow_color.G * 5, glow_color.B * 5)
 
     local body_parts = self:_refresh_body_parts(entry, model)
-    if #body_parts < 10 then
-        entry._body_parts_char = nil
-        body_parts = self:_refresh_body_parts(entry, model)
-    end
 
     local seen = {}
     for _, part in ipairs(body_parts) do
