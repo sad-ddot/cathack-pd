@@ -1,6 +1,5 @@
-local ESPLib = {}
-ESPLib.__index = ESPLib
-ESPLib._version = "0.3.0"
+local esp = {}
+esp.__index = esp
 
 local RunService = game:GetService("RunService")
 local Players    = game:GetService("Players")
@@ -9,14 +8,13 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
 local function wtvp(pos)
-    local sp, on = Camera:WorldToViewportPoint(pos)
-    return sp, on
+    return Camera:WorldToViewportPoint(pos)
 end
 
 local function get_hum_hrp(model)
     if not model or not model.Parent then return nil, nil end
     local hum = model:FindFirstChildOfClass("Humanoid")
-    if not hum or hum.Health <= 0 then return nil, nil end
+    if not hum then return nil, nil end
     local hrp = model:FindFirstChild("HumanoidRootPart")
     if not hrp then return nil, nil end
     return hum, hrp
@@ -54,13 +52,14 @@ local BODY_PARTS = {
     "RightUpperLeg", "RightLowerLeg", "RightFoot",
 }
 
+local HP_SEGMENTS = 12
+
 local DEFAULT_STYLE = {
     enabled = true,
     max_distance = 3000,
 
-    teamcheck = false,
-    friendcheck = false,
     include_ai = true,
+    death_fade_time = 1.5,
 
     box = { enabled = true, thickness = 1, color = Color3.fromRGB(255,255,255), transparency = 1 },
     box_outline = { enabled = true, thickness = 3, color = Color3.fromRGB(0,0,0), transparency = 1 },
@@ -76,8 +75,8 @@ local DEFAULT_STYLE = {
         thickness = 3,
         outline_thickness = 1,
         outline_color = Color3.fromRGB(0,0,0),
-        color_full = Color3.fromRGB(90, 220, 90),
-        color_low = Color3.fromRGB(220, 90, 90),
+        color_top = Color3.fromRGB(90, 220, 90),
+        color_bot = Color3.fromRGB(220, 90, 90),
         show_text = false,
         text_size = 11,
         text_font = 2,
@@ -95,7 +94,13 @@ local DEFAULT_STYLE = {
     visible_color = nil,
     hitscan_color = nil,
 
-    off_screen_arrow = { enabled = false, size = 20, color = Color3.fromRGB(255,80,80), radius = 200 },
+    off_screen_arrow = {
+        enabled = false,
+        size = 20,
+        color = Color3.fromRGB(255, 200, 80),
+        radius = 200,
+        fade_time = 0.18,
+    },
 
     loot = {
         enabled = false,
@@ -129,8 +134,8 @@ local function deep_merge(dst, src)
     end
 end
 
-function ESPLib.new(config)
-    local self = setmetatable({}, ESPLib)
+function esp.new(config)
+    local self = setmetatable({}, esp)
     self.style = {}
     deep_merge(self.style, DEFAULT_STYLE)
     if config then deep_merge(self.style, config) end
@@ -150,14 +155,14 @@ function ESPLib.new(config)
     return self
 end
 
-function ESPLib:SetTargetFilter(fn) self._is_target_fn = fn end
-function ESPLib:SetVisibleCheck(fn) self._visible_check_fn = fn end
-function ESPLib:SetHitscanCheck(fn) self._hitscan_check_fn = fn end
-function ESPLib:SetWeaponGetter(fn) self._weapon_getter = fn end
-function ESPLib:SetLootRoot(fn) self._loot_root_getter = fn end
-function ESPLib:SetLootWorth(fn) self._loot_worth_getter = fn end
+function esp:SetTargetFilter(fn) self._is_target_fn = fn end
+function esp:SetVisibleCheck(fn) self._visible_check_fn = fn end
+function esp:SetHitscanCheck(fn) self._hitscan_check_fn = fn end
+function esp:SetWeaponGetter(fn) self._weapon_getter = fn end
+function esp:SetLootRoot(fn) self._loot_root_getter = fn end
+function esp:SetLootWorth(fn) self._loot_worth_getter = fn end
 
-function ESPLib:_should_track(subject, is_npc)
+function esp:_should_track(subject, is_npc)
     if is_npc then return self.style.include_ai end
     if subject == LocalPlayer then return false end
     if self._is_target_fn then
@@ -167,12 +172,12 @@ function ESPLib:_should_track(subject, is_npc)
     return true
 end
 
-function ESPLib:_get_model(subject, is_npc)
+function esp:_get_model(subject, is_npc)
     if is_npc then return subject end
     return subject.Character
 end
 
-function ESPLib:_create_entry(subject, is_npc)
+function esp:_create_entry(subject, is_npc)
     local entry = {
         subject = subject,
         is_npc = is_npc,
@@ -184,23 +189,38 @@ function ESPLib:_create_entry(subject, is_npc)
             displayname = new_drawing("Text", { Center = true, Visible = false, ZIndex = 4 }),
             distance    = new_drawing("Text", { Center = true, Visible = false, ZIndex = 4 }),
             weapon      = new_drawing("Text", { Center = true, Visible = false, ZIndex = 4 }),
-            hp_bar      = new_drawing("Line", { Visible = false, ZIndex = 3 }),
             hp_outline  = new_drawing("Line", { Visible = false, ZIndex = 2 }),
             hp_text     = new_drawing("Text", { Center = false, Visible = false, ZIndex = 4 }),
-            arrow       = new_drawing("Triangle", { Filled = true, Visible = false, ZIndex = 3 }),
+            arrow       = new_drawing("Triangle", { Filled = true, Visible = false, ZIndex = 3, Transparency = 0 }),
         },
+        hp_segments = {},
         skel_lines = {},
         adornments = {},
+        arrow_alpha = 0,
+        death_at = nil,
+        last_hp = 100,
+        last_max_hp = 100,
     }
+    for i = 1, HP_SEGMENTS do
+        entry.hp_segments[i] = new_drawing("Line", { Visible = false, ZIndex = 3 })
+    end
     return entry
 end
 
-function ESPLib:_destroy_entry(entry)
+function esp:_destroy_entry(entry)
     destroy_all(entry.objs)
     for _, ln in pairs(entry.skel_lines) do
         if ln then ln:Remove() end
     end
     entry.skel_lines = {}
+    for _, ln in pairs(entry.hp_segments) do
+        if ln then ln:Remove() end
+    end
+    entry.hp_segments = {}
+    self:_clear_chams(entry)
+end
+
+function esp:_clear_chams(entry)
     for _, pair in pairs(entry.adornments) do
         for _, a in ipairs(pair) do
             if a and a.Parent then a:Destroy() end
@@ -209,7 +229,7 @@ function ESPLib:_destroy_entry(entry)
     entry.adornments = {}
 end
 
-function ESPLib:_ensure_skel(entry)
+function esp:_ensure_skel(entry)
     if not self.style.skeleton.enabled then
         for _, ln in pairs(entry.skel_lines) do ln.Visible = false end
         return
@@ -221,38 +241,60 @@ function ESPLib:_ensure_skel(entry)
     end
 end
 
-function ESPLib:_refresh_body_parts(entry, model)
-    if entry._body_parts_char == model then return entry._body_parts end
-    local parts = {}
+local function collect_body_parts(model)
+    local out = {}
+    local seen = {}
     for _, name in ipairs(BODY_PARTS) do
-        local p = model:FindFirstChild(name)
-        if p and p:IsA("BasePart") then parts[#parts + 1] = p end
+        local p = model:FindFirstChild(name, true)
+        if p and p:IsA("BasePart") and not seen[p] then
+            seen[p] = true
+            out[#out + 1] = p
+        end
     end
-    entry._body_parts = parts
-    entry._body_parts_char = model
-    return parts
-end
-
-function ESPLib:_apply_chams(entry, model)
-    local ch = self.style.chams
-    if not ch.enabled then
-        for _, pair in pairs(entry.adornments) do
-            for _, a in ipairs(pair) do
-                if a and a.Parent then a:Destroy() end
+    for _, d in ipairs(model:GetDescendants()) do
+        if d:IsA("BasePart") and not seen[d] and d.Name ~= "HumanoidRootPart" and d.Transparency < 1 then
+            local nm = d.Name
+            for _, bp in ipairs(BODY_PARTS) do
+                if nm == bp then
+                    seen[d] = true
+                    out[#out + 1] = d
+                    break
+                end
             end
         end
-        entry.adornments = {}
+    end
+    return out
+end
+
+function esp:_refresh_body_parts(entry, model)
+    if entry._body_parts_char == model and entry._body_parts and #entry._body_parts > 0 then
+        return entry._body_parts
+    end
+    entry._body_parts = collect_body_parts(model)
+    entry._body_parts_char = model
+    return entry._body_parts
+end
+
+function esp:_apply_chams(entry, model)
+    local ch = self.style.chams
+    if not ch.enabled then
+        self:_clear_chams(entry)
         return
     end
     local main_color = ch.hidden_color
     local glow_color = ch.visible_color
     local main_trans = ch.hidden_transparency
     local glow_target = Color3.new(glow_color.R * 5, glow_color.G * 5, glow_color.B * 5)
-    local seen = {}
-    local body_parts = self:_refresh_body_parts(entry, model)
 
+    local body_parts = self:_refresh_body_parts(entry, model)
+    if #body_parts < 10 then
+        entry._body_parts_char = nil
+        body_parts = self:_refresh_body_parts(entry, model)
+    end
+
+    local seen = {}
     for _, part in ipairs(body_parts) do
-        if part.Parent == model and part.Transparency < 1 then
+        if part.Parent and part.Transparency < 1 then
             seen[part] = true
             local is_head = (part.Name == "Head") or (part.Name == "FakeHead")
             local existing = entry.adornments[part]
@@ -315,13 +357,13 @@ function ESPLib:_apply_chams(entry, model)
     end
 end
 
-function ESPLib:_get_color(base_color, is_visible, is_hitscan)
+function esp:_get_color(base_color, is_visible, is_hitscan)
     if is_hitscan and self.style.hitscan_color then return self.style.hitscan_color end
     if is_visible and self.style.visible_color then return self.style.visible_color end
     return base_color
 end
 
-function ESPLib:_project_corners(cf, size)
+function esp:_project_corners(cf, size)
     local xs, ys, zs = size.X * 0.5, size.Y * 0.5, size.Z * 0.5
     local corners = {
         cf * Vector3.new(-xs, -ys, -zs),
@@ -351,10 +393,10 @@ local function lerp_color(c1, c2, t)
     return Color3.new(c1.R + (c2.R - c1.R) * t, c1.G + (c2.G - c1.G) * t, c1.B + (c2.B - c1.B) * t)
 end
 
-function ESPLib:_draw_hp(entry, pos, sz, hp, max_hp)
+function esp:_draw_hp(entry, pos, sz, hp, max_hp, alpha)
     local h = self.style.health
     if not h.enabled or max_hp <= 0 then
-        entry.objs.hp_bar.Visible = false
+        for _, ln in ipairs(entry.hp_segments) do ln.Visible = false end
         entry.objs.hp_outline.Visible = false
         entry.objs.hp_text.Visible = false
         return
@@ -362,23 +404,45 @@ function ESPLib:_draw_hp(entry, pos, sz, hp, max_hp)
     local ratio = math.clamp(hp / max_hp, 0, 1)
     local bar_h = sz.Y
     local x = pos.X - 4 - h.thickness
-    local top = Vector2.new(x, pos.Y)
-    local bot = Vector2.new(x, pos.Y + bar_h)
-    local fill_top = Vector2.new(x, pos.Y + bar_h * (1 - ratio))
+    local top_y = pos.Y
+    local bot_y = pos.Y + bar_h
+    local fill_top_y = pos.Y + bar_h * (1 - ratio)
+    local trans = 1 - (alpha or 1)
 
     local ob = entry.objs.hp_outline
-    ob.From = Vector2.new(x, pos.Y - 1)
-    ob.To = Vector2.new(x, pos.Y + bar_h + 1)
+    ob.From = Vector2.new(x, top_y - 1)
+    ob.To = Vector2.new(x, bot_y + 1)
     ob.Thickness = h.thickness + h.outline_thickness * 2
     ob.Color = h.outline_color
+    ob.Transparency = 1 - (alpha or 1)
     ob.Visible = true
 
-    local bar = entry.objs.hp_bar
-    bar.From = fill_top
-    bar.To = bot
-    bar.Thickness = h.thickness
-    bar.Color = lerp_color(h.color_low, h.color_full, ratio)
-    bar.Visible = true
+    local visible_top = math.max(fill_top_y, top_y)
+    local visible_h = math.max(bot_y - visible_top, 0)
+    for i = 1, HP_SEGMENTS do
+        local seg = entry.hp_segments[i]
+        if visible_h <= 0.5 then
+            seg.Visible = false
+        else
+            local t0 = (i - 1) / HP_SEGMENTS
+            local t1 = i / HP_SEGMENTS
+            local sy0 = visible_top + visible_h * t0
+            local sy1 = visible_top + visible_h * t1
+            if sy1 - sy0 < 0.5 then
+                seg.Visible = false
+            else
+                local color_t = (sy0 + sy1) * 0.5
+                local rel = (color_t - top_y) / bar_h
+                rel = math.clamp(rel, 0, 1)
+                seg.From = Vector2.new(x, sy0)
+                seg.To = Vector2.new(x, sy1 + 0.5)
+                seg.Thickness = h.thickness
+                seg.Color = lerp_color(h.color_top, h.color_bot, rel)
+                seg.Transparency = 1 - (alpha or 1)
+                seg.Visible = true
+            end
+        end
+    end
 
     if h.show_text then
         local tx = entry.objs.hp_text
@@ -388,16 +452,18 @@ function ESPLib:_draw_hp(entry, pos, sz, hp, max_hp)
         tx.Color = Color3.new(1,1,1)
         tx.Outline = true
         tx.OutlineColor = Color3.new(0,0,0)
-        tx.Position = Vector2.new(x - 2, fill_top.Y - h.text_size / 2)
+        tx.Transparency = alpha or 1
+        tx.Position = Vector2.new(x - 2, fill_top_y - h.text_size / 2)
         tx.Visible = true
     else
         entry.objs.hp_text.Visible = false
     end
 end
 
-function ESPLib:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible)
+function esp:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible, alpha)
     local stack_top = {}
     local stack_bot = {}
+    local trans = alpha or 1
 
     if self.style.name.enabled then
         local n = entry.objs.name
@@ -407,7 +473,8 @@ function ESPLib:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible)
         n.Color = self:_get_color(self.style.name.color, is_visible, false)
         n.Outline = self.style.name.outline
         n.OutlineColor = self.style.name.outline_color
-        table.insert(stack_top, n)
+        n.Transparency = trans
+        stack_top[#stack_top + 1] = n
     else
         entry.objs.name.Visible = false
     end
@@ -420,7 +487,8 @@ function ESPLib:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible)
         d.Color = self.style.displayname.color
         d.Outline = self.style.displayname.outline
         d.OutlineColor = self.style.displayname.outline_color
-        table.insert(stack_top, d)
+        d.Transparency = trans
+        stack_top[#stack_top + 1] = d
     else
         entry.objs.displayname.Visible = false
     end
@@ -433,7 +501,8 @@ function ESPLib:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible)
         ds.Color = self.style.distance.color
         ds.Outline = self.style.distance.outline
         ds.OutlineColor = self.style.distance.outline_color
-        table.insert(stack_bot, ds)
+        ds.Transparency = trans
+        stack_bot[#stack_bot + 1] = ds
     else
         entry.objs.distance.Visible = false
     end
@@ -451,7 +520,8 @@ function ESPLib:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible)
         w.Color = self.style.weapon.color
         w.Outline = self.style.weapon.outline
         w.OutlineColor = self.style.weapon.outline_color
-        if wname ~= "" then table.insert(stack_bot, w) else w.Visible = false end
+        w.Transparency = trans
+        if wname ~= "" then stack_bot[#stack_bot + 1] = w else w.Visible = false end
     else
         entry.objs.weapon.Visible = false
     end
@@ -472,7 +542,8 @@ function ESPLib:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible)
     end
 end
 
-function ESPLib:_draw_box(entry, pos, sz, is_visible)
+function esp:_draw_box(entry, pos, sz, is_visible, alpha)
+    local a = alpha or 1
     if not self.style.box.enabled and not self.style.box_outline.enabled and not self.style.box_fill.enabled then
         entry.objs.box.Visible = false
         entry.objs.box_outline.Visible = false
@@ -484,7 +555,7 @@ function ESPLib:_draw_box(entry, pos, sz, is_visible)
         f.Size = sz
         f.Position = pos
         f.Color = self.style.box_fill.color
-        f.Transparency = self.style.box_fill.transparency
+        f.Transparency = self.style.box_fill.transparency * a
         f.Visible = true
     else
         entry.objs.box_fill.Visible = false
@@ -495,7 +566,7 @@ function ESPLib:_draw_box(entry, pos, sz, is_visible)
         o.Position = pos
         o.Thickness = self.style.box_outline.thickness
         o.Color = self.style.box_outline.color
-        o.Transparency = self.style.box_outline.transparency
+        o.Transparency = self.style.box_outline.transparency * a
         o.Visible = true
     else
         entry.objs.box_outline.Visible = false
@@ -506,77 +577,96 @@ function ESPLib:_draw_box(entry, pos, sz, is_visible)
         b.Position = pos
         b.Thickness = self.style.box.thickness
         b.Color = self:_get_color(self.style.box.color, is_visible, false)
-        b.Transparency = self.style.box.transparency
+        b.Transparency = self.style.box.transparency * a
         b.Visible = true
     else
         entry.objs.box.Visible = false
     end
 end
 
-function ESPLib:_draw_skeleton(entry, model)
+function esp:_draw_skeleton(entry, model, alpha)
     self:_ensure_skel(entry)
     if not self.style.skeleton.enabled then return end
+    local trans = 1 - (alpha or 1)
     for i, pair in ipairs(skeleton_bones) do
         local ln = entry.skel_lines[i]
-        if not ln then continue end
-        local a = model:FindFirstChild(pair[1])
-        local b = model:FindFirstChild(pair[2])
-        if a and b and a:IsA("BasePart") and b:IsA("BasePart") then
-            local sa, oa = wtvp(a.Position)
-            local sb, ob = wtvp(b.Position)
-            if oa and ob then
-                ln.From = Vector2.new(sa.X, sa.Y)
-                ln.To = Vector2.new(sb.X, sb.Y)
-                ln.Thickness = self.style.skeleton.thickness
-                ln.Color = self.style.skeleton.color
-                ln.Visible = true
+        if ln then
+            local a = model:FindFirstChild(pair[1])
+            local b = model:FindFirstChild(pair[2])
+            if a and b and a:IsA("BasePart") and b:IsA("BasePart") then
+                local sa, oa = wtvp(a.Position)
+                local sb, ob = wtvp(b.Position)
+                if oa and ob then
+                    ln.From = Vector2.new(sa.X, sa.Y)
+                    ln.To = Vector2.new(sb.X, sb.Y)
+                    ln.Thickness = self.style.skeleton.thickness
+                    ln.Color = self.style.skeleton.color
+                    ln.Transparency = 1 - (alpha or 1)
+                    ln.Visible = true
+                else
+                    ln.Visible = false
+                end
             else
                 ln.Visible = false
             end
-        else
-            ln.Visible = false
         end
     end
 end
 
-function ESPLib:_draw_arrow(entry, model)
+function esp:_draw_arrow(entry, model, dt)
     local a = self.style.off_screen_arrow
-    if not a.enabled then
-        entry.objs.arrow.Visible = false
-        return
-    end
     local hum, hrp = get_hum_hrp(model)
-    if not hrp then
+    local want = false
+    local px, py, angle
+    if a.enabled and hrp then
+        local sp, on = wtvp(hrp.Position)
+        if not on then
+            local vp = Camera.ViewportSize
+            local cx, cy = vp.X * 0.5, vp.Y * 0.5
+            local dx, dy = sp.X - cx, sp.Y - cy
+            if sp.Z < 0 then dx, dy = -dx, -dy end
+            angle = math.atan2(dy, dx)
+            px = cx + math.cos(angle) * a.radius
+            py = cy + math.sin(angle) * a.radius
+            want = true
+        end
+    end
+
+    local fade = a.fade_time or 0.18
+    local step = dt / math.max(fade, 0.01)
+    if want then
+        entry.arrow_alpha = math.min(1, (entry.arrow_alpha or 0) + step)
+    else
+        entry.arrow_alpha = math.max(0, (entry.arrow_alpha or 0) - step)
+    end
+
+    if entry.arrow_alpha <= 0 or not want and entry.arrow_alpha < 0.02 then
         entry.objs.arrow.Visible = false
         return
     end
-    local sp, on = wtvp(hrp.Position)
-    if on then
-        entry.objs.arrow.Visible = false
-        return
+
+    if want then
+        local sz = a.size
+        local tri = entry.objs.arrow
+        tri.PointA = Vector2.new(px + math.cos(angle) * sz, py + math.sin(angle) * sz)
+        tri.PointB = Vector2.new(px + math.cos(angle + 2.6) * sz * 0.6, py + math.sin(angle + 2.6) * sz * 0.6)
+        tri.PointC = Vector2.new(px + math.cos(angle - 2.6) * sz * 0.6, py + math.sin(angle - 2.6) * sz * 0.6)
+        tri.Color = a.color
+        tri.Transparency = entry.arrow_alpha
+        tri.Visible = true
+    else
+        entry.objs.arrow.Transparency = entry.arrow_alpha
     end
-    local vp = Camera.ViewportSize
-    local cx, cy = vp.X * 0.5, vp.Y * 0.5
-    local dx, dy = sp.X - cx, sp.Y - cy
-    if sp.Z < 0 then dx, dy = -dx, -dy end
-    local angle = math.atan2(dy, dx)
-    local px = cx + math.cos(angle) * a.radius
-    local py = cy + math.sin(angle) * a.radius
-    local sz = a.size
-    local tri = entry.objs.arrow
-    tri.PointA = Vector2.new(px + math.cos(angle) * sz, py + math.sin(angle) * sz)
-    tri.PointB = Vector2.new(px + math.cos(angle + 2.6) * sz * 0.6, py + math.sin(angle + 2.6) * sz * 0.6)
-    tri.PointC = Vector2.new(px + math.cos(angle - 2.6) * sz * 0.6, py + math.sin(angle - 2.6) * sz * 0.6)
-    tri.Color = a.color
-    tri.Visible = true
 end
 
-function ESPLib:_hide_entry(entry)
+function esp:_hide_entry(entry)
     for _, obj in pairs(entry.objs) do obj.Visible = false end
     for _, ln in pairs(entry.skel_lines) do ln.Visible = false end
+    for _, ln in pairs(entry.hp_segments) do ln.Visible = false end
+    self:_clear_chams(entry)
 end
 
-function ESPLib:_update_entry(entry)
+function esp:_update_entry(entry, dt)
     if not self.style.enabled then
         self:_hide_entry(entry)
         return
@@ -584,14 +674,39 @@ function ESPLib:_update_entry(entry)
     local model = self:_get_model(entry.subject, entry.is_npc)
     if not model then self:_hide_entry(entry); return end
     local hum, hrp = get_hum_hrp(model)
-    if not hum then self:_hide_entry(entry); return end
+
+    local now = tick()
+    local alive = hum and hum.Health > 0
+
+    if alive then
+        entry.death_at = nil
+        entry.last_hp = hum.Health
+        entry.last_max_hp = hum.MaxHealth
+        entry.last_hrp = hrp
+    else
+        if not entry.death_at then entry.death_at = now end
+    end
+
+    local alpha = 1
+    if not alive then
+        local elapsed = now - (entry.death_at or now)
+        local dur = self.style.death_fade_time or 1.5
+        if elapsed >= dur then
+            self:_hide_entry(entry)
+            return
+        end
+        alpha = 1 - (elapsed / dur)
+        hrp = entry.last_hrp
+        if not hrp or not hrp.Parent then self:_hide_entry(entry); return end
+        hum = { Health = entry.last_hp, MaxHealth = entry.last_max_hp }
+    end
 
     local lp_char = LocalPlayer.Character
     local lp_hrp = lp_char and lp_char:FindFirstChild("HumanoidRootPart")
     local dist = lp_hrp and (lp_hrp.Position - hrp.Position).Magnitude or 0
     if dist > self.style.max_distance then
         self:_hide_entry(entry)
-        self:_draw_arrow(entry, model)
+        self:_draw_arrow(entry, model, dt)
         return
     end
 
@@ -600,30 +715,38 @@ function ESPLib:_update_entry(entry)
     local pos, sz = self:_project_corners(cf, size)
     if not pos then
         self:_hide_entry(entry)
-        self:_draw_arrow(entry, model)
+        self:_draw_arrow(entry, model, dt)
         return
     end
-    entry.objs.arrow.Visible = false
 
     local is_visible = false
-    if self._visible_check_fn then
+    if self._visible_check_fn and alive then
         local ok2, vis = pcall(self._visible_check_fn, entry.subject, model, hrp.Position)
         if ok2 then is_visible = vis == true end
     end
     local is_hitscan = false
-    if self._hitscan_check_fn then
+    if self._hitscan_check_fn and alive then
         local ok3, hs = pcall(self._hitscan_check_fn, entry.subject, model, hrp.Position)
         if ok3 then is_hitscan = hs == true end
     end
 
-    self:_apply_chams(entry, model)
-    self:_draw_box(entry, pos, sz, is_visible)
-    self:_draw_hp(entry, pos, sz, hum.Health, hum.MaxHealth)
-    self:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible)
-    self:_draw_skeleton(entry, model)
+    if alive then
+        self:_apply_chams(entry, model)
+    else
+        self:_clear_chams(entry)
+    end
+    self:_draw_box(entry, pos, sz, is_visible, alpha)
+    self:_draw_hp(entry, pos, sz, hum.Health, hum.MaxHealth, alpha)
+    self:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible, alpha)
+    if alive then
+        self:_draw_skeleton(entry, model, alpha)
+    else
+        for _, ln in pairs(entry.skel_lines) do ln.Visible = false end
+    end
+    self:_draw_arrow(entry, model, dt)
 end
 
-function ESPLib:Add(subject, is_npc)
+function esp:Add(subject, is_npc)
     if not subject then return end
     if self._entries[subject] then return self._entries[subject] end
     if not self:_should_track(subject, is_npc) then return end
@@ -632,23 +755,28 @@ function ESPLib:Add(subject, is_npc)
     return entry
 end
 
-function ESPLib:Remove(subject)
+function esp:Remove(subject)
     local entry = self._entries[subject]
     if not entry then return end
     self:_destroy_entry(entry)
     self._entries[subject] = nil
 end
 
-function ESPLib:GetEntry(subject) return self._entries[subject] end
+function esp:GetEntry(subject) return self._entries[subject] end
 
-function ESPLib:UpdateStyle(patch)
+function esp:UpdateStyle(patch)
     if not patch then return end
     deep_merge(self.style, patch)
+    if patch.chams and patch.chams.enabled == false then
+        for _, entry in pairs(self._entries) do
+            self:_clear_chams(entry)
+        end
+    end
 end
 
-function ESPLib:Set(path, value)
+function esp:Set(path, value)
     local parts = {}
-    for p in string.gmatch(path, "[^%.]+") do table.insert(parts, p) end
+    for p in string.gmatch(path, "[^%.]+") do parts[#parts + 1] = p end
     local node = self.style
     for i = 1, #parts - 1 do
         node = node[parts[i]]
@@ -657,7 +785,7 @@ function ESPLib:Set(path, value)
     node[parts[#parts]] = value
 end
 
-function ESPLib:_scan_loot(now)
+function esp:_scan_loot(now)
     local l = self.style.loot
     if not l.enabled then
         for _, e in pairs(self._loot_entries) do
@@ -698,7 +826,7 @@ function ESPLib:_scan_loot(now)
     end
 end
 
-function ESPLib:_render_loot()
+function esp:_render_loot()
     local l = self.style.loot
     if not l.enabled then return end
     local lp = LocalPlayer.Character
@@ -737,7 +865,7 @@ function ESPLib:_render_loot()
     end
 end
 
-function ESPLib:_update_trails(now)
+function esp:_update_trails(now)
     local tr = self.style.trail
     if not tr.enabled then
         for _, td in pairs(self._trail_data) do
@@ -756,13 +884,13 @@ function ESPLib:_update_trails(now)
                     td = { points = {}, lines = {} }
                     self._trail_data[subject] = td
                 end
-                table.insert(td.points, { pos = pos, t = now })
+                td.points[#td.points + 1] = { pos = pos, t = now }
                 while #td.points > tr.max_segments do table.remove(td.points, 1) end
                 while td.points[1] and (now - td.points[1].t) > tr.segment_life do
                     table.remove(td.points, 1)
                 end
                 while #td.lines < #td.points - 1 do
-                    table.insert(td.lines, new_drawing("Line", { Visible = false, Thickness = tr.thickness, Color = tr.color, Transparency = 1 - tr.transparency }))
+                    td.lines[#td.lines + 1] = new_drawing("Line", { Visible = false, Thickness = tr.thickness, Color = tr.color, Transparency = 1 - tr.transparency })
                 end
                 while #td.lines > #td.points - 1 do
                     local ln = table.remove(td.lines)
@@ -796,14 +924,14 @@ function ESPLib:_update_trails(now)
     end
 end
 
-function ESPLib:Start()
+function esp:Start()
     if self._running then return end
     self._running = true
 
     local pa = Players.PlayerAdded:Connect(function(p) self:Add(p, false) end)
     local pr = Players.PlayerRemoving:Connect(function(p) self:Remove(p) end)
-    table.insert(self._connections, pa)
-    table.insert(self._connections, pr)
+    self._connections[#self._connections + 1] = pa
+    self._connections[#self._connections + 1] = pr
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer then self:Add(p, false) end
     end
@@ -821,23 +949,23 @@ function ESPLib:Start()
         local ar = ai_folder.DescendantRemoving:Connect(function(m)
             if self._entries[m] then self:Remove(m) end
         end)
-        table.insert(self._connections, aa)
-        table.insert(self._connections, ar)
+        self._connections[#self._connections + 1] = aa
+        self._connections[#self._connections + 1] = ar
     end
 
-    local rs = RunService.RenderStepped:Connect(function()
+    local rs = RunService.RenderStepped:Connect(function(dt)
         local now = tick()
         for _, entry in pairs(self._entries) do
-            self:_update_entry(entry)
+            self:_update_entry(entry, dt)
         end
         self:_scan_loot(now)
         self:_render_loot()
         self:_update_trails(now)
     end)
-    table.insert(self._connections, rs)
+    self._connections[#self._connections + 1] = rs
 end
 
-function ESPLib:Stop()
+function esp:Stop()
     self._running = false
     for _, c in ipairs(self._connections) do
         c:Disconnect()
@@ -859,4 +987,4 @@ function ESPLib:Stop()
     self._trail_data = {}
 end
 
-return ESPLib
+return esp
