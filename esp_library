@@ -195,7 +195,9 @@ function esp:_create_entry(subject, is_npc)
         },
         hp_segments = {},
         skel_lines = {},
-        highlight = nil,
+        adornments = {},
+        chams_model = nil,
+        chams_conns = nil,
         arrow_alpha = 0,
         death_at = nil,
         last_hp = 100,
@@ -220,13 +222,6 @@ function esp:_destroy_entry(entry)
     self:_clear_chams(entry)
 end
 
-function esp:_clear_chams(entry)
-    if entry.highlight then
-        if entry.highlight.Parent then entry.highlight:Destroy() end
-        entry.highlight = nil
-    end
-end
-
 function esp:_ensure_skel(entry)
     if not self.style.skeleton.enabled then
         for _, ln in pairs(entry.skel_lines) do ln.Visible = false end
@@ -241,26 +236,131 @@ end
 
 
 
+local function is_body_part(inst)
+    if not (inst and inst:IsA("BasePart")) then return false end
+    if inst.Name == "HumanoidRootPart" then return false end
+    if inst:GetAttribute("PDIgnoreChams") == true then return false end
+    local nm = string.lower(inst.Name or "")
+    if nm == "ignoreme" or nm == "pdserverpositionclone" then return false end
+    if nm == "facehitbox" or nm == "headtophitbox" then return false end
+    if nm:find("lagcham", 1, true) then return false end
+    if nm:find("fakecham", 1, true) then return false end
+    return true
+end
+
+function esp:_ensure_part_adorns(entry, part, glow_target, main_color, main_trans)
+    local is_head = (part.Name == "Head") or (part.Name == "FakeHead")
+    local pair = entry.adornments[part]
+    local glow_ad = pair and pair[1]
+    local main_ad = pair and pair[2]
+
+    if typeof(glow_ad) ~= "Instance" or glow_ad.Parent ~= part then
+        glow_ad = Instance.new("BoxHandleAdornment")
+        glow_ad.Name = "_g"
+        glow_ad.AlwaysOnTop = true
+        glow_ad.ZIndex = is_head and 10 or 9
+        glow_ad.Adornee = part
+        glow_ad.Size = part.Size + Vector3.new(0.03, 0.03, 0.03)
+        glow_ad.Color3 = glow_target
+        glow_ad.Transparency = -1
+        pcall(function() glow_ad.Shading = Enum.AdornShading.XRayShaded end)
+        glow_ad.Parent = part
+    end
+    if typeof(main_ad) ~= "Instance" or main_ad.Parent ~= part then
+        main_ad = Instance.new("BoxHandleAdornment")
+        main_ad.Name = "_m"
+        main_ad.AlwaysOnTop = true
+        main_ad.ZIndex = 10
+        main_ad.Adornee = part
+        main_ad.Size = part.Size + Vector3.new(0.02, 0.02, 0.02)
+        main_ad.Color3 = main_color
+        main_ad.Transparency = main_trans
+        main_ad.Parent = part
+    end
+    glow_ad.Color3 = glow_target
+    glow_ad.Transparency = -1
+    glow_ad.Size = part.Size + Vector3.new(0.03, 0.03, 0.03)
+    main_ad.Color3 = main_color
+    main_ad.Transparency = main_trans
+    main_ad.Size = part.Size + Vector3.new(0.02, 0.02, 0.02)
+
+    entry.adornments[part] = { glow_ad, main_ad }
+end
+
+function esp:_clear_chams(entry)
+    if entry.chams_conns then
+        for _, c in ipairs(entry.chams_conns) do if c then c:Disconnect() end end
+        entry.chams_conns = nil
+    end
+    entry.chams_model = nil
+    if entry.adornments then
+        for _, pair in pairs(entry.adornments) do
+            for _, a in ipairs(pair) do
+                if a and a.Parent then a:Destroy() end
+            end
+        end
+    end
+    entry.adornments = {}
+end
+
 function esp:_apply_chams(entry, model)
     local ch = self.style.chams
     if not ch.enabled then
         self:_clear_chams(entry)
         return
     end
-    local hl = entry.highlight
-    if not hl or not hl.Parent then
-        hl = Instance.new("Highlight")
-        hl.Name = "_h"
-        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        hl.Parent = model
-        entry.highlight = hl
+    entry.adornments = entry.adornments or {}
+    local main_color = ch.hidden_color
+    local glow_color = ch.visible_color
+    local main_trans = ch.hidden_transparency
+    local glow_target = Color3.new(glow_color.R * 5, glow_color.G * 5, glow_color.B * 5)
+
+    if entry.chams_model ~= model then
+        if entry.chams_conns then
+            for _, c in ipairs(entry.chams_conns) do if c then c:Disconnect() end end
+        end
+        entry.chams_conns = {}
+        for part, pair in pairs(entry.adornments) do
+            for _, a in ipairs(pair) do
+                if a and a.Parent then a:Destroy() end
+            end
+            entry.adornments[part] = nil
+        end
+        entry.chams_model = model
+
+        local this = self
+        local function on_added(d)
+            if is_body_part(d) then
+                this:_ensure_part_adorns(entry, d, glow_target, main_color, main_trans)
+            end
+        end
+        local function on_removed(d)
+            local pair = entry.adornments[d]
+            if pair then
+                for _, a in ipairs(pair) do
+                    if a and a.Parent then a:Destroy() end
+                end
+                entry.adornments[d] = nil
+            end
+        end
+        entry.chams_conns[#entry.chams_conns + 1] = model.DescendantAdded:Connect(on_added)
+        entry.chams_conns[#entry.chams_conns + 1] = model.DescendantRemoving:Connect(on_removed)
     end
-    if hl.Adornee ~= model then hl.Adornee = model end
-    hl.FillColor = ch.hidden_color
-    hl.FillTransparency = ch.hidden_transparency
-    hl.OutlineColor = ch.visible_color
-    hl.OutlineTransparency = ch.outline_transparency or 0
-    hl.Enabled = true
+
+    for _, d in ipairs(model:GetDescendants()) do
+        if is_body_part(d) then
+            self:_ensure_part_adorns(entry, d, glow_target, main_color, main_trans)
+        end
+    end
+
+    for part, pair in pairs(entry.adornments) do
+        if not part.Parent or not part:IsDescendantOf(model) then
+            for _, a in ipairs(pair) do
+                if a and a.Parent then a:Destroy() end
+            end
+            entry.adornments[part] = nil
+        end
+    end
 end
 
 function esp:_get_color(base_color, is_visible, is_hitscan)
