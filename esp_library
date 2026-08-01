@@ -217,6 +217,12 @@ function esp:_destroy_entry(entry)
         if ln then ln:Remove() end
     end
     entry.hp_segments = {}
+    if entry._body_parts_conns then
+        for _, c in ipairs(entry._body_parts_conns) do
+            if c then c:Disconnect() end
+        end
+        entry._body_parts_conns = nil
+    end
     self:_clear_chams(entry)
 end
 
@@ -264,15 +270,35 @@ local function collect_body_parts(model)
 end
 
 function esp:_refresh_body_parts(entry, model)
-    local now = tick()
-    local stale = (entry._body_parts_char ~= model)
-        or not entry._body_parts
-        or ((now - (entry._body_parts_scan or 0)) >= 0.5)
-    if stale then
-        entry._body_parts = collect_body_parts(model)
-        entry._body_parts_char = model
-        entry._body_parts_scan = now
+    if entry._body_parts_char == model and entry._body_parts then
+        return entry._body_parts
     end
+    if entry._body_parts_conns then
+        for _, c in ipairs(entry._body_parts_conns) do
+            if c then c:Disconnect() end
+        end
+    end
+    entry._body_parts_conns = {}
+    entry._body_parts = collect_body_parts(model)
+    entry._body_parts_char = model
+
+    local function add(child)
+        if is_ignored_body_part(child) then return end
+        for _, p in ipairs(entry._body_parts) do
+            if p == child then return end
+        end
+        entry._body_parts[#entry._body_parts + 1] = child
+    end
+    local function rem(child)
+        for i, p in ipairs(entry._body_parts) do
+            if p == child then
+                table.remove(entry._body_parts, i)
+                return
+            end
+        end
+    end
+    entry._body_parts_conns[#entry._body_parts_conns + 1] = model.ChildAdded:Connect(add)
+    entry._body_parts_conns[#entry._body_parts_conns + 1] = model.ChildRemoved:Connect(rem)
     return entry._body_parts
 end
 
