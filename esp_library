@@ -69,7 +69,7 @@ local DEFAULT_STYLE = {
     displayname = { enabled = false, size = 12, font = 2, color = Color3.fromRGB(200,200,200), outline = true, outline_color = Color3.fromRGB(0,0,0) },
     distance = { enabled = true, size = 12, font = 2, color = Color3.fromRGB(200,200,200), outline = true, outline_color = Color3.fromRGB(0,0,0), suffix = "m" },
     weapon = { enabled = false, size = 12, font = 2, color = Color3.fromRGB(200,200,200), outline = true, outline_color = Color3.fromRGB(0,0,0) },
-    weapon_icon = { enabled = false, size = 22, position = "above_bar", placeholder_text = "?" },
+    weapon_icon = { enabled = false, size = 22, position = "below_box", placeholder_text = "?" },
 
     health = {
         enabled = true,
@@ -724,26 +724,29 @@ function esp:_draw_weapon_icon(entry, pos, sz, model, alpha)
         ic.holder.Visible = false
         return
     end
-    local a = alpha or 1
     local key
     if self._weapon_getter then
         local ok, r = pcall(self._weapon_getter, entry.subject, model)
-        if ok and r and r ~= "" then key = tostring(r) end
+        if ok and r and r ~= "" and r ~= "None" then key = tostring(r) end
+    end
+    if not key then
+        ic.holder.Visible = false
+        ic.current_key = nil
+        return
     end
 
     local asset
-    if key and self._weapon_icon_getter then
+    if self._weapon_icon_getter then
         local ok, r = pcall(self._weapon_icon_getter, key)
-        if ok then asset = r end
+        if ok and r then asset = r end
     end
 
-    if key ~= ic.current_key then
+    if key ~= ic.current_key or (asset and ic.img.Image ~= asset) then
         ic.current_key = key
         if asset then
             ic.img.Image = asset
             ic.img.Visible = true
             ic.placeholder.Visible = false
-            ic.placeholder.Text = ""
         else
             ic.img.Visible = false
             ic.img.Image = ""
@@ -752,17 +755,16 @@ function esp:_draw_weapon_icon(entry, pos, sz, model, alpha)
         end
     end
 
+    local a = alpha or 1
     local icon_size = cfg.size or 22
     ic.holder.Size = UDim2.fromOffset(icon_size, icon_size)
     local cx = pos.X + sz.X * 0.5
+    local mode = cfg.position or "below_box"
     local y
-    local mode = cfg.position or "above_bar"
-    if mode == "above_bar" then
-        y = pos.Y - icon_size * 0.5 - 4
-    elseif mode == "below_name" then
-        y = pos.Y - icon_size * 0.5 - 4
+    if mode == "above_box" or mode == "above_bar" or mode == "above_name" then
+        y = pos.Y - icon_size * 0.5 - 6
     else
-        y = pos.Y + sz.Y + icon_size * 0.5 + 4
+        y = pos.Y + sz.Y + icon_size * 0.5 + 6
     end
     ic.holder.Position = UDim2.fromOffset(cx, y)
     ic.holder.Visible = true
