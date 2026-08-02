@@ -701,10 +701,8 @@ function esp:_layout_slots(pos, sz, groups)
         end
     end
 
-    local function place_side_stack(items, base_x, base_y, align_x)
-        local total_h = 0
-        for _, it in ipairs(items) do total_h = total_h + it.h + 1 end
-        local y = base_y - total_h * 0.5
+    local function place_side_down(items, base_x, base_y, align_x)
+        local y = base_y
         for _, it in ipairs(items) do
             if it.kind == "text" then
                 if align_x == "left" then
@@ -723,6 +721,27 @@ function esp:_layout_slots(pos, sz, groups)
         end
     end
 
+    local function place_side_up(items, base_x, base_y, align_x)
+        local y = base_y
+        for i = #items, 1, -1 do
+            local it = items[i]
+            y = y - it.h - 1
+            if it.kind == "text" then
+                if align_x == "left" then
+                    it.d.Center = false
+                    it.d.Position = Vector2.new(base_x, y)
+                else
+                    local w = it.d.TextBounds and it.d.TextBounds.X or 0
+                    it.d.Center = false
+                    it.d.Position = Vector2.new(base_x - w, y)
+                end
+                it.d.Visible = true
+            elseif it.kind == "icon" then
+                it.set_pos(base_x, y + it.h * 0.5, align_x)
+            end
+        end
+    end
+
     for slot_id, items in pairs(groups) do
         if slot_id == "top-left" then
             place_vertical(items, left, top, -1, "left")
@@ -737,13 +756,13 @@ function esp:_layout_slots(pos, sz, groups)
         elseif slot_id == "bottom-right" then
             place_vertical(items, right, bot, 1, "right")
         elseif slot_id == "left-top" then
-            place_side_stack(items, left - 6, top + sz.Y * 0.25, "right")
+            place_side_down(items, left - 6, top, "right")
         elseif slot_id == "left-bottom" then
-            place_side_stack(items, left - 6, top + sz.Y * 0.75, "right")
+            place_side_up(items, left - 6, bot, "right")
         elseif slot_id == "right-top" then
-            place_side_stack(items, right + 6, top + sz.Y * 0.25, "left")
+            place_side_down(items, right + 6, top, "left")
         elseif slot_id == "right-bottom" then
-            place_side_stack(items, right + 6, top + sz.Y * 0.75, "left")
+            place_side_up(items, right + 6, bot, "left")
         end
     end
 end
