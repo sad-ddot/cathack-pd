@@ -535,7 +535,7 @@ function esp:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible, alph
         n.Outline = self.style.name.outline
         n.OutlineColor = self.style.name.outline_color
         n.Transparency = trans
-        push(valid_slot(self.style.name.slot, "top-center"), { kind = "text", d = n, w = 0, h = n.Size })
+        push(valid_slot(self.style.name.slot, "top-center"), { kind = "text", d = n, w = 0, h = n.Size, ord = self.style.name.order or 1 })
     else
         entry.objs.name.Visible = false
     end
@@ -549,7 +549,7 @@ function esp:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible, alph
         d.Outline = self.style.displayname.outline
         d.OutlineColor = self.style.displayname.outline_color
         d.Transparency = trans
-        push(valid_slot(self.style.displayname.slot, "top-center"), { kind = "text", d = d, w = 0, h = d.Size })
+        push(valid_slot(self.style.displayname.slot, "top-center"), { kind = "text", d = d, w = 0, h = d.Size, ord = self.style.displayname.order or 2 })
     else
         entry.objs.displayname.Visible = false
     end
@@ -563,7 +563,7 @@ function esp:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible, alph
         ds.Outline = self.style.distance.outline
         ds.OutlineColor = self.style.distance.outline_color
         ds.Transparency = trans
-        push(valid_slot(self.style.distance.slot, "bottom-center"), { kind = "text", d = ds, w = 0, h = ds.Size })
+        push(valid_slot(self.style.distance.slot, "bottom-center"), { kind = "text", d = ds, w = 0, h = ds.Size, ord = self.style.distance.order or 3 })
     else
         entry.objs.distance.Visible = false
     end
@@ -583,12 +583,64 @@ function esp:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible, alph
         w.OutlineColor = self.style.weapon.outline_color
         w.Transparency = trans
         if wname ~= "" then
-            push(valid_slot(self.style.weapon.slot, "bottom-center"), { kind = "text", d = w, w = 0, h = w.Size })
+            push(valid_slot(self.style.weapon.slot, "bottom-center"), { kind = "text", d = w, w = 0, h = w.Size, ord = self.style.weapon.order or 4 })
         else
             w.Visible = false
         end
     else
         entry.objs.weapon.Visible = false
+    end
+
+    local wic = self.style.weapon_icon
+    local wi_slot = wic and wic.slot and valid_slot(wic.slot, nil)
+    if wic and wic.enabled and wi_slot and entry.icon then
+        local key
+        if self._weapon_getter then
+            local ok, r = pcall(self._weapon_getter, entry.subject, model)
+            if ok and r and r ~= "" and r ~= "None" then key = tostring(r) end
+        end
+        local asset
+        if key then
+            local registered = false
+            if self._weapon_icon_getter then
+                local ok, a, reg = pcall(self._weapon_icon_getter, key)
+                if ok then if a then asset = a end; if reg then registered = true end end
+            end
+            if not asset and not registered and self._weapon_icon_fallback then
+                local ok, r = pcall(self._weapon_icon_fallback, key, entry.subject, model)
+                if ok and r then asset = r end
+            end
+        end
+        local ic = entry.icon
+        if asset then
+            if key ~= ic.current_key or ic.img.Image ~= asset then
+                ic.current_key = key
+                ic.img.Image = asset
+            end
+            local sz_i = wic.size or 22
+            ic.img.Visible = true
+            ic.holder.Size = UDim2.fromOffset(sz_i, sz_i)
+            ic.img.ImageTransparency = 1 - (alpha or 1)
+            local function set_pos(base_x, base_y, align_x)
+                local px = base_x
+                if align_x == "left" then px = base_x + sz_i * 0.5
+                elseif align_x == "right" then px = base_x - sz_i * 0.5 end
+                ic.holder.Position = UDim2.fromOffset(px, base_y)
+                ic.holder.Visible = true
+            end
+            entry._icon_slot_active = true
+            push(wi_slot, { kind = "icon", set_pos = set_pos, w = sz_i, h = sz_i, ord = wic.order or 5 })
+        else
+            ic.holder.Visible = false
+            ic.current_key = nil
+            entry._icon_slot_active = true
+        end
+    else
+        entry._icon_slot_active = false
+    end
+
+    for _, items in pairs(groups) do
+        table.sort(items, function(a, b) return (a.ord or 99) < (b.ord or 99) end)
     end
 
     self:_layout_slots(pos, sz, groups)
@@ -822,6 +874,7 @@ function esp:_draw_weapon_icon(entry, pos, sz, model, alpha)
         ic.current_key = nil
         return
     end
+    if entry._icon_slot_active then return end
     local key
     if self._weapon_getter then
         local ok, r = pcall(self._weapon_getter, entry.subject, model)
