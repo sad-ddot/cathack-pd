@@ -7,8 +7,16 @@ local Workspace  = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
+local function get_camera()
+    local current = Workspace.CurrentCamera
+    if current then Camera = current end
+    return Camera
+end
+
 local function wtvp(pos)
-    return Camera:WorldToViewportPoint(pos)
+    local cam = get_camera()
+    if not cam then return Vector3.new(0, 0, -1), false end
+    return cam:WorldToViewportPoint(pos)
 end
 
 local function get_hum_hrp(model)
@@ -411,6 +419,8 @@ function esp:_get_color(base_color, is_visible, is_hitscan)
 end
 
 function esp:_project_corners(cf, size)
+    local cam = get_camera()
+    if not cam then return nil end
     local xs, ys, zs = size.X * 0.5, size.Y * 0.5, size.Z * 0.5
     local corners = {
         cf * Vector3.new(-xs, -ys, -zs),
@@ -423,17 +433,31 @@ function esp:_project_corners(cf, size)
         cf * Vector3.new( xs,  ys,  zs),
     }
     local min_x, min_y, max_x, max_y = math.huge, math.huge, -math.huge, -math.huge
+    local front_count = 0
     local any_on = false
     for i = 1, 8 do
         local sp, on = wtvp(corners[i])
-        if on then any_on = true end
-        if sp.X < min_x then min_x = sp.X end
-        if sp.Y < min_y then min_y = sp.Y end
-        if sp.X > max_x then max_x = sp.X end
-        if sp.Y > max_y then max_y = sp.Y end
+        if sp.Z > 0.05 then
+            front_count = front_count + 1
+            if on then any_on = true end
+            if sp.X < min_x then min_x = sp.X end
+            if sp.Y < min_y then min_y = sp.Y end
+            if sp.X > max_x then max_x = sp.X end
+            if sp.Y > max_y then max_y = sp.Y end
+        end
     end
-    if not any_on then return nil end
-    return Vector2.new(min_x, min_y), Vector2.new(max_x - min_x, max_y - min_y)
+    if front_count == 0 or not any_on then return nil end
+    local vp = cam.ViewportSize
+    local margin = 64
+    min_x = math.clamp(min_x, -margin, vp.X + margin)
+    min_y = math.clamp(min_y, -margin, vp.Y + margin)
+    max_x = math.clamp(max_x, -margin, vp.X + margin)
+    max_y = math.clamp(max_y, -margin, vp.Y + margin)
+    local width = max_x - min_x
+    local height = max_y - min_y
+    if width < 1 or height < 1 then return nil end
+    if width > vp.X * 1.35 or height > vp.Y * 1.35 then return nil end
+    return Vector2.new(min_x, min_y), Vector2.new(width, height)
 end
 
 local function lerp_color(c1, c2, t)
@@ -617,7 +641,7 @@ function esp:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible, alph
                 ic.current_key = key
                 ic.img.Image = asset
             end
-            local sz_i = wic.size or 22
+            local sz_i = math.clamp(tonumber(wic.size) or 22, 10, 32)
             ic.img.Visible = true
             ic.holder.Size = UDim2.fromOffset(sz_i, sz_i)
             ic.img.ImageTransparency = 1 - (alpha or 1)
@@ -931,7 +955,7 @@ function esp:_draw_weapon_icon(entry, pos, sz, model, alpha)
     end
 
     local a = alpha or 1
-    local icon_size = cfg.size or 22
+    local icon_size = math.clamp(tonumber(cfg.size) or 22, 10, 32)
     ic.holder.Size = UDim2.fromOffset(icon_size, icon_size)
     local cx = pos.X + sz.X * 0.5
     local mode = cfg.position or "below_box"
