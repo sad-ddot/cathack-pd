@@ -461,6 +461,22 @@ function esp:_project_corners(cf, size)
     local height = max_y - min_y
     if width < 1 or height < 1 then return nil end
     if width > vp.X * 1.35 or height > vp.Y * 1.35 then return nil end
+
+    local depth = 0
+    pcall(function() depth = (cf.Position - cam.CFrame.Position).Magnitude end)
+    depth = math.max(depth, 1)
+    local min_width = math.clamp(320 / depth, 4, 10)
+    local min_height = math.clamp(900 / depth, 10, 22)
+    local center_x = (min_x + max_x) * 0.5
+    local center_y = (min_y + max_y) * 0.5
+    if width < min_width then
+        width = min_width
+        min_x = center_x - width * 0.5
+    end
+    if height < min_height then
+        height = min_height
+        min_y = center_y - height * 0.5
+    end
     return Vector2.new(min_x, min_y), Vector2.new(width, height)
 end
 
@@ -470,7 +486,7 @@ end
 
 function esp:_draw_hp(entry, pos, sz, hp, max_hp, alpha)
     local h = self.style.health
-    if not h.enabled or max_hp <= 0 or sz.Y < 4 then
+    if not h.enabled or max_hp <= 0 or sz.Y < 12 then
         for _, ln in ipairs(entry.hp_segments) do ln.Visible = false end
         entry.objs.hp_outline.Visible = false
         entry.objs.hp_text.Visible = false
