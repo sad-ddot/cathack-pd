@@ -4,6 +4,7 @@ esp.__index = esp
 local RunService = game:GetService("RunService")
 local Players    = game:GetService("Players")
 local Workspace  = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
@@ -78,6 +79,7 @@ local DEFAULT_STYLE = {
     distance = { enabled = true, size = 12, font = 2, color = Color3.fromRGB(200,200,200), outline = true, outline_color = Color3.fromRGB(0,0,0), suffix = "m", slot = "bottom-center" },
     weapon = { enabled = false, size = 12, font = 2, color = Color3.fromRGB(200,200,200), outline = true, outline_color = Color3.fromRGB(0,0,0), slot = "bottom-center" },
     weapon_icon = { enabled = false, size = 22, slot = "bottom-center" },
+    kd = { enabled = false, size = 12, font = 2, color = Color3.fromRGB(200, 200, 200), outline = true, outline_color = Color3.fromRGB(0, 0, 0), slot = "right-top", order = 6 },
 
     health = {
         enabled = true,
@@ -162,6 +164,7 @@ function esp.new(config)
     self._loot_root_getter = nil
     self._loot_worth_getter = nil
     self._last_loot_scan = 0
+    self._kd_cache = setmetatable({}, {__mode = "k"})
 
     local gui_parent = (gethui and gethui()) or game:GetService("CoreGui")
     local gui = Instance.new("ScreenGui")
@@ -212,6 +215,7 @@ function esp:_create_entry(subject, is_npc)
             displayname = new_drawing("Text", { Center = true, Visible = false, ZIndex = 4 }),
             distance    = new_drawing("Text", { Center = true, Visible = false, ZIndex = 4 }),
             weapon      = new_drawing("Text", { Center = true, Visible = false, ZIndex = 4 }),
+            kd          = new_drawing("Text", { Center = false, Visible = false, ZIndex = 4 }),
             hp_outline  = new_drawing("Line", { Visible = false, ZIndex = 2 }),
             hp_text     = new_drawing("Text", { Center = false, Visible = false, ZIndex = 4 }),
             arrow       = new_drawing("Triangle", { Filled = true, Visible = false, ZIndex = 3, Transparency = 0 }),
@@ -541,6 +545,37 @@ local function valid_slot(s, default)
     return default or "top-center"
 end
 
+function esp:_get_kd(subject)
+    if not subject or typeof(subject) ~= "Instance" or not subject:IsA("Player" ) then
+        return "KD 0.0"
+    end
+    local now = os.clock()
+    local cached = self._kd_cache[subject]
+    if cached and now - cached.t < 1.5 then
+        return cached.text
+    end
+
+    local text_value = "KD 0.0"
+    pcall(function()
+        local players_folder = ReplicatedStorage:FindFirstChild("Players")
+        local player_folder = players_folder and players_folder:FindFirstChild(subject.Name)
+        local stats = player_folder and (player_folder:FindFirstChild("WipeStatistics", true)
+            or player_folder:FindFirstChild("Statistics", true))
+        if stats then
+            local kills = tonumber(stats:GetAttribute("Kills")) or 0
+            local deaths = tonumber(stats:GetAttribute("Deaths")) or 0
+            local ratio = deaths > 0 and (kills / deaths) or kills
+            if math.abs(ratio - math.floor(ratio + 0.00001)) < 0.00001 then
+                text_value = string.format("KD %d", math.floor(ratio))
+            else
+                text_value = string.format("KD %.1f", ratio)
+            end
+        end
+    end)
+    self._kd_cache[subject] = {t = now, text = text_value}
+    return text_value
+end
+
 function esp:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible, alpha)
     local trans = alpha or 1
     local groups = {}
@@ -613,6 +648,20 @@ function esp:_draw_text_stack(entry, pos, sz, model, hum, dist, is_visible, alph
         end
     else
         entry.objs.weapon.Visible = false
+    end
+
+    if self.style.kd and self.style.kd.enabled and not entry.is_npc then
+        local kd = entry.objs.kd
+        kd.Text = self:_get_kd(entry.subject)
+        kd.Size = self.style.kd.size or 12
+        kd.Font = self.style.kd.font or 2
+        kd.Color = self.style.kd.color or Color3.fromRGB(200, 200, 200)
+        kd.Outline = self.style.kd.outline ~= false
+        kd.OutlineColor = self.style.kd.outline_color or Color3.new(0, 0, 0)
+        kd.Transparency = trans
+        push(valid_slot(self.style.kd.slot, "right-top"), { kind = "text", d = kd, w = 0, h = kd.Size, ord = self.style.kd.order or 6 })
+    else
+        entry.objs.kd.Visible = false
     end
 
     local wic = self.style.weapon_icon
