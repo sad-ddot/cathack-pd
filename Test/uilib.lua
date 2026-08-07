@@ -575,7 +575,7 @@ function Library:Window(data)
     new("UIPadding", {PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6)}, tabBar)
     
     local underline = new("Frame", {Size = UDim2.fromOffset(0, 0), Position = UDim2.fromOffset(0, 0), BackgroundColor3 = Library.Theme.Accent, BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false}, main)
-    local underlineBloom = new("UIStroke", {Color = Library.Theme.Accent, Thickness = 4, Transparency = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Visible = false}, underline)
+    local underlineBloom = new("UIStroke", {Color = Library.Theme.Accent, Thickness = 4, Transparency = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, underline)
     
     local pageRoot = new("Frame", {Size = UDim2.new(1, -135, 1, -20), Position = UDim2.fromOffset(125, 10), BackgroundTransparency = 1, ClipsDescendants = true}, main)
     
