@@ -536,7 +536,8 @@ function Library:Window(data)
         Parent = main,
         Size = UDim2.new(0, 120, 1, 0),
         BackgroundColor3 = Color3.fromRGB(13, 13, 15),
-        BorderSizePixel = 0
+        BorderSizePixel = 0,
+        ZIndex = 10
     })
     
     local sidebarDivider = new("Frame", {
@@ -545,18 +546,19 @@ function Library:Window(data)
         Position = UDim2.new(1, -1, 0, 0),
         Size = UDim2.new(0, 1, 1, 0),
         BackgroundColor3 = Library.Theme.Stroke,
-        BorderSizePixel = 0
+        BorderSizePixel = 0,
+        ZIndex = 11
     })
     
-    local header = new("Frame", {Size = UDim2.new(1, -120, 0, 38), Position = UDim2.fromOffset(120, 0), BackgroundColor3 = Library.Theme.Bg, BackgroundTransparency = 1, BorderSizePixel = 0}, main)
+    local header = new("Frame", {Size = UDim2.new(1, -120, 0, 38), Position = UDim2.fromOffset(120, 0), BackgroundColor3 = Library.Theme.Bg, BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 10}, main)
     
-    local logo = new("Frame", {Size = UDim2.fromOffset(26, 26), Position = UDim2.fromOffset(12, 12), BackgroundColor3 = Library.Theme.Accent, BackgroundTransparency = 0, BorderSizePixel = 0}, sidebar)
+    local logo = new("Frame", {Size = UDim2.fromOffset(26, 26), Position = UDim2.fromOffset(12, 12), BackgroundColor3 = Library.Theme.Accent, BackgroundTransparency = 0, BorderSizePixel = 0, ZIndex = 12}, sidebar)
     round(logo, 6)
     local logoAsset = resolveLogo(data.Logo)
     local logoImage
     if logoAsset then
         logo.BackgroundTransparency = 1
-        logoImage = new("ImageLabel", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Image = logoAsset, ImageColor3 = Color3.new(1, 1, 1), ScaleType = Enum.ScaleType.Fit}, logo)
+        logoImage = new("ImageLabel", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Image = logoAsset, ImageColor3 = Color3.new(1, 1, 1), ScaleType = Enum.ScaleType.Fit, ZIndex = 13}, logo)
         task.delay(2, function()
             if logoImage and logoImage.Parent and not logoImage.IsLoaded then
                 local fallback = resolveLogo(nil)
@@ -564,20 +566,20 @@ function Library:Window(data)
             end
         end)
     else
-        new("TextLabel", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "C", TextColor3 = Color3.new(1, 1, 1), TextSize = 14, FontFace = Library.Font}, logo)
+        new("TextLabel", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "C", TextColor3 = Color3.new(1, 1, 1), TextSize = 14, FontFace = Library.Font, ZIndex = 13}, logo)
     end
     
-    local titleLabel = new("TextLabel", {Size = UDim2.fromOffset(70, 26), Position = UDim2.fromOffset(45, 12), BackgroundTransparency = 1, Text = title, TextColor3 = Library.Theme.Text, TextSize = 13, FontFace = Library.Font, TextXAlignment = Enum.TextXAlignment.Left}, sidebar)
+    local titleLabel = new("TextLabel", {Size = UDim2.fromOffset(70, 26), Position = UDim2.fromOffset(45, 12), BackgroundTransparency = 1, Text = title, TextColor3 = Library.Theme.Text, TextSize = 13, FontFace = Library.Font, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12}, sidebar)
     new("UIGradient", {Color = ColorSequence.new(Library.Theme.Accent, Color3.fromRGB(245, 245, 245)), Rotation = 0}, titleLabel)
     
-    local tabBar = new("Frame", {Size = UDim2.new(1, 0, 1, -55), Position = UDim2.fromOffset(0, 55), BackgroundTransparency = 1, BorderSizePixel = 0}, sidebar)
+    local tabBar = new("Frame", {Size = UDim2.new(1, 0, 1, -55), Position = UDim2.fromOffset(0, 55), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 12}, sidebar)
     new("UIListLayout", {FillDirection = Enum.FillDirection.Vertical, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4)}, tabBar)
     new("UIPadding", {PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6)}, tabBar)
     
     local underline = new("Frame", {Size = UDim2.fromOffset(0, 0), Position = UDim2.fromOffset(0, 0), BackgroundColor3 = Library.Theme.Accent, BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false}, main)
     local underlineBloom = new("UIStroke", {Color = Library.Theme.Accent, Thickness = 4, Transparency = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, underline)
     
-    local pageRoot = new("Frame", {Size = UDim2.new(1, -135, 1, -20), Position = UDim2.fromOffset(125, 10), BackgroundTransparency = 1, ClipsDescendants = true}, main)
+    local pageRoot = new("Frame", {Size = UDim2.new(1, -135, 1, -20), Position = UDim2.fromOffset(125, 10), BackgroundTransparency = 1, ClipsDescendants = true, ZIndex = 10}, main)
     
     local notifyHolder = new("Frame", {AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -14, 1, -14), Size = UDim2.fromOffset(260, 360), BackgroundTransparency = 1, ZIndex = 9500}, gui)
     new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6), VerticalAlignment = Enum.VerticalAlignment.Bottom}, notifyHolder)
@@ -708,7 +710,8 @@ function WindowMethods:Page(data)
         Text = "",
         AutoButtonColor = false,
         BorderSizePixel = 0,
-        LayoutOrder = self.PageCount
+        LayoutOrder = self.PageCount,
+        ZIndex = 12
     }, self.TabBar)
     round(tab, 4)
     
@@ -719,7 +722,8 @@ function WindowMethods:Page(data)
         Position = UDim2.new(0, 0, 0.2, 0),
         BackgroundColor3 = Library.Theme.Accent,
         BackgroundTransparency = 1,
-        BorderSizePixel = 0
+        BorderSizePixel = 0,
+        ZIndex = 13
     })
     round(tabIndicator, 2)
     
@@ -733,7 +737,8 @@ function WindowMethods:Page(data)
         TextColor3 = Library.Theme.Dim,
         TextSize = 11,
         FontFace = Library.Font,
-        TextXAlignment = Enum.TextXAlignment.Left
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 13
     })
     
     local hasIcon = type(data.Icon) == "string" and data.Icon ~= ""
@@ -750,16 +755,17 @@ function WindowMethods:Page(data)
             TextSize = 11,
             FontFace = Library.Font,
             TextXAlignment = Enum.TextXAlignment.Center,
-            TextYAlignment = Enum.TextYAlignment.Center
+            TextYAlignment = Enum.TextYAlignment.Center,
+            ZIndex = 13
         })
         tabText.Position = UDim2.fromOffset(28, 0)
         tabText.Size = UDim2.new(1, -30, 1, 0)
     end
 
-    local page = new("CanvasGroup", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, GroupTransparency = 1, Visible = false}, self.PageRoot)
+    local page = new("CanvasGroup", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, GroupTransparency = 1, Visible = false, ZIndex = 11}, self.PageRoot)
     local pageScale = new("UIScale", {Scale = 0.985}, page)
-    local left = new("ScrollingFrame", {Size = UDim2.new(0.5, -5, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 2, ScrollBarImageColor3 = Library.Theme.AccentDk, CanvasSize = UDim2.new(0, 0, 0, 0)}, page)
-    local right = new("ScrollingFrame", {Size = UDim2.new(0.5, -5, 1, 0), Position = UDim2.new(0.5, 5, 0, 0), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 2, ScrollBarImageColor3 = Library.Theme.AccentDk, CanvasSize = UDim2.new(0, 0, 0, 0)}, page)
+    local left = new("ScrollingFrame", {Size = UDim2.new(0.5, -5, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 2, ScrollBarImageColor3 = Library.Theme.AccentDk, CanvasSize = UDim2.new(0, 0, 0, 0), ZIndex = 12}, page)
+    local right = new("ScrollingFrame", {Size = UDim2.new(0.5, -5, 1, 0), Position = UDim2.new(0.5, 5, 0, 0), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 2, ScrollBarImageColor3 = Library.Theme.AccentDk, CanvasSize = UDim2.new(0, 0, 0, 0), ZIndex = 12}, page)
     local leftLayout = new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8)}, left)
     local rightLayout = new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8)}, right)
     new("UIPadding", {PaddingBottom = UDim.new(0, 8)}, left)
@@ -909,7 +915,8 @@ function PageMethods:SubPage(data)
             Size = UDim2.new(1, 0, 0, 30),
             Position = UDim2.fromOffset(0, 0),
             BackgroundColor3 = Color3.fromRGB(15, 15, 17),
-            BorderSizePixel = 0
+            BorderSizePixel = 0,
+            ZIndex = 20
         })
         
         local subDivider = new("Frame", {
@@ -919,7 +926,8 @@ function PageMethods:SubPage(data)
             Size = UDim2.new(1, 0, 0, 1),
             BackgroundColor3 = Library.Theme.Stroke,
             BackgroundTransparency = 0.5,
-            BorderSizePixel = 0
+            BorderSizePixel = 0,
+            ZIndex = 20
         })
 
         self.SubPageHidden = new("Frame", {Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false}, self.Page)
@@ -971,7 +979,8 @@ function PageMethods:SubPage(data)
         FontFace = Library.Font,
         TextXAlignment = Enum.TextXAlignment.Center,
         AutoButtonColor = false,
-        LayoutOrder = #self.SubPages + 1
+        LayoutOrder = #self.SubPages + 1,
+        ZIndex = 21
     }, self.SubPageRoot)
     
     local accent = new("Frame", {
@@ -979,7 +988,8 @@ function PageMethods:SubPage(data)
         Position = UDim2.new(0, 0, 1, -2),
         BackgroundColor3 = Library.Theme.Accent,
         BackgroundTransparency = 1,
-        BorderSizePixel = 0
+        BorderSizePixel = 0,
+        ZIndex = 22
     })
     accent.Parent = button
     
