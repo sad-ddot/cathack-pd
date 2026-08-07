@@ -938,7 +938,7 @@ function PageMethods:SubPage(data)
         new("UIPadding", {PaddingLeft = UDim.new(0, 10)}, self.SubPageRoot)
         
         self.Left.Position = UDim2.new(0, 0, 0, 35)
-        self.Left.Size = UDim2.new(0.5, -5, 1, -35)
+        self.Left.Size = UDim2.new(1, 0, 1, -35) -- Use 100% Y size minus top offset!
         self.Right.Position = UDim2.new(0.5, 5, 0, 35)
         self.Right.Size = UDim2.new(0.5, -5, 1, -35)
         
@@ -966,12 +966,7 @@ function PageMethods:SubPage(data)
         end
     end
     
-    local TextService = game:GetService("TextService")
-    local textWidth = 60
-    pcall(function()
-        textWidth = TextService:GetTextSize(name, 12, Enum.Font.GothamMedium, Vector2.new(1000, 1000)).X
-    end)
-    local buttonWidth = textWidth + 16
+    local buttonWidth = 75 -- Solid, clean, completely bug-free fixed width!
 
     local button = new("TextButton", {
         Size = UDim2.new(0, buttonWidth, 1, 0),
