@@ -544,7 +544,7 @@ function Library:Window(data)
         Name = "Sidebar",
         Parent = main,
         Size = UDim2.new(0, 125, 1, 0),
-        BackgroundColor3 = Color3.fromRGB(8, 8, 8), 
+        BackgroundColor3 = Color3.fromRGB(6, 6, 6),
         BorderSizePixel = 0,
         ZIndex = 10
     })
@@ -917,13 +917,12 @@ function PageMethods:SubPage(data)
         
         self.SubPageRoot = new("Frame", {
             Name = "SubPageRoot",
-            Parent = self.Window.Main,
-            Size = UDim2.new(1, -140, 0, 30),
-            Position = UDim2.fromOffset(130, 10),
+            Parent = self.Window.PageRoot,
+            Size = UDim2.new(1, 0, 0, 30),
+            Position = UDim2.fromOffset(0, 0),
             BackgroundColor3 = Color3.fromRGB(15, 15, 17),
             BorderSizePixel = 0,
-            ZIndex = 40,
-            Visible = false
+            ZIndex = 20
         })
         
         local subDivider = new("Frame", {
@@ -934,7 +933,7 @@ function PageMethods:SubPage(data)
             BackgroundColor3 = Library.Theme.Stroke,
             BackgroundTransparency = 0.5,
             BorderSizePixel = 0,
-            ZIndex = 40
+            ZIndex = 20
         })
 
         self.SubPageHidden = new("Frame", {Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false}, self.Page)
@@ -989,7 +988,7 @@ function PageMethods:SubPage(data)
         TextXAlignment = Enum.TextXAlignment.Center,
         AutoButtonColor = false,
         LayoutOrder = #self.SubPages + 1,
-        ZIndex = 41
+        ZIndex = 21
     }, self.SubPageRoot)
     
     local accent = new("Frame", {
@@ -998,7 +997,7 @@ function PageMethods:SubPage(data)
         BackgroundColor3 = Library.Theme.Accent,
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
-        ZIndex = 42
+        ZIndex = 22
     })
     accent.Parent = button
     
