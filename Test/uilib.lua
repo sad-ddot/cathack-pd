@@ -807,9 +807,6 @@ function WindowMethods:SelectPage(name)
         else
             page.Page.Visible = false
         end
-        if page.SubPageRoot then
-            page.SubPageRoot.Visible = active
-        end
     end
     for tabName, tab in pairs(self.Tabs) do
         local active = tabName == name
@@ -917,7 +914,7 @@ function PageMethods:SubPage(data)
         
         self.SubPageRoot = new("Frame", {
             Name = "SubPageRoot",
-            Parent = self.Window.PageRoot,
+            Parent = self.Page,
             Size = UDim2.new(1, 0, 0, 30),
             Position = UDim2.fromOffset(0, 0),
             BackgroundColor3 = Color3.fromRGB(15, 15, 17),
