@@ -529,7 +529,7 @@ function Library:Window(data)
         Visible = false
     }, gui)
     
-    local mainScale = new("UIScale", {Scale = 0.95}, main)
+    local mainScale = new("UIScale", {Scale = 0.92}, main)
     round(main, 4)
     local mainStrokes = softOuterGlow(main, Library.Theme.Stroke, 5, 1, 0.3)
     for _, s in ipairs(mainStrokes) do s.Transparency = 1 end
@@ -544,7 +544,7 @@ function Library:Window(data)
         Name = "Sidebar",
         Parent = main,
         Size = UDim2.new(0, 125, 1, 0),
-        BackgroundColor3 = Color3.fromRGB(6, 6, 6),
+        BackgroundColor3 = Color3.fromRGB(8, 8, 8), 
         BorderSizePixel = 0,
         ZIndex = 10
     })
@@ -598,7 +598,7 @@ function Library:Window(data)
     
     task.defer(function()
         main.Visible = true
-        tween(mainScale, {Scale = 1}, 0.25, Enum.EasingStyle.Back)
+        tween(mainScale, {Scale = 1}, 0.3, Enum.EasingStyle.Back)
         for i, s in ipairs(mainStrokes) do
             s.Transparency = mainStrokeTargets[i]
         end
@@ -652,8 +652,8 @@ function WindowMethods:SetOpen(value)
             self.ESPPreviewObject.Frame.Visible = true 
         end
         local targetScale = Library.UIScale or 1
-        self.MainScale.Scale = targetScale * 0.95
-        tween(self.MainScale, {Scale = targetScale}, 0.25, Enum.EasingStyle.Back)
+        self.MainScale.Scale = targetScale * 0.92
+        tween(self.MainScale, {Scale = targetScale}, 0.3, Enum.EasingStyle.Back)
         for i, strokeObject in ipairs(self.MainStrokes or {}) do
             tween(strokeObject, {Transparency = (self.MainStrokeTargets or {})[i] or 0.3}, 0.22)
         end
@@ -664,7 +664,7 @@ function WindowMethods:SetOpen(value)
         for _, strokeObject in ipairs(self.MainStrokes or {}) do 
             tween(strokeObject, {Transparency = 1}, 0.16) 
         end
-        tween(self.MainScale, {Scale = 0.95}, 0.16, Enum.EasingStyle.Quad).Completed:Connect(function()
+        tween(self.MainScale, {Scale = 0.92}, 0.18, Enum.EasingStyle.Quad).Completed:Connect(function()
             if not self.Open then self.Main.Visible = false end
         end)
     end
@@ -803,7 +803,7 @@ function WindowMethods:SelectPage(name)
         if active then
             page.Page.Visible = true
             page.Page.Position = UDim2.fromOffset(15, 0)
-            tween(page.Page, {Position = UDim2.fromOffset(0, 0)}, 0.22, Enum.EasingStyle.Quart)
+            tween(page.Page, {Position = UDim2.fromOffset(0, 0)}, 0.25, Enum.EasingStyle.Quart)
         else
             page.Page.Visible = false
         end
@@ -917,7 +917,7 @@ function PageMethods:SubPage(data)
             Parent = self.Page,
             Size = UDim2.new(1, 0, 0, 30),
             Position = UDim2.fromOffset(0, 0),
-            BackgroundColor3 = Color3.fromRGB(15, 15, 17),
+            BackgroundColor3 = Color3.fromRGB(8, 8, 8), -- Same as menu background color!
             BorderSizePixel = 0,
             ZIndex = 20
         })
@@ -948,8 +948,9 @@ function PageMethods:SubPage(data)
             self.CurrentSubPage = label
             for buttonName, buttonData in pairs(self.SubPageButtons) do
                 local on = buttonName == label
-                tween(buttonData.Button, {TextColor3 = on and Color3.new(1, 1, 1) or Library.Theme.Dim, BackgroundTransparency = 1}, 0.16)
+                tween(buttonData.Button, {TextColor3 = on and Library.Theme.Accent or Library.Theme.Dim, BackgroundTransparency = 1}, 0.16)
                 tween(buttonData.Accent, {BackgroundTransparency = on and 0 or 1}, 0.16)
+                tween(buttonData.Glow, {BackgroundTransparency = on and 0.55 or 1}, 0.16)
             end
             for _, section in ipairs(self.Sections) do
                 local visible = section.SubPage == label or section.SubPage == nil
@@ -995,12 +996,44 @@ function PageMethods:SubPage(data)
     })
     accent.Parent = button
     
-    self.SubPageButtons[name] = {Button = button, Accent = accent}
+    new("UIGradient", {
+        Rotation = 0,
+        Color = ColorSequence.new(Library.Theme.Accent, Library.Theme.Accent),
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1),
+            NumberSequenceKeypoint.new(0.2, 0),
+            NumberSequenceKeypoint.new(0.8, 0),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+    }, accent)
+    
+    local glow = new("Frame", {
+        Name = "Glow",
+        Parent = button,
+        Size = UDim2.new(1, 10, 0, 5),
+        Position = UDim2.new(0, -5, 1, -2),
+        BackgroundColor3 = Library.Theme.Accent,
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ZIndex = 22
+    })
+    glow.Parent = button
+    
+    new("UIGradient", {
+        Rotation = 90,
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.45),
+            NumberSequenceKeypoint.new(0.5, 0.7),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+    }, glow)
+    
+    self.SubPageButtons[name] = {Button = button, Accent = accent, Glow = glow}
     self.SubPages[#self.SubPages + 1] = name
     
     connect(button.MouseButton1Click, function() self:SelectSubPage(name) end)
     connect(button.MouseEnter, function() if self.CurrentSubPage ~= name then tween(button, {TextColor3 = Library.Theme.Text}, 0.12) end end)
-    connect(button.MouseLeave, function() if self.CurrentPage ~= name then tween(button, {TextColor3 = Library.Theme.Dim}, 0.12) end end)
+    connect(button.MouseLeave, function() if self.CurrentSubPage ~= name then tween(button, {TextColor3 = Library.Theme.Dim}, 0.12) end end)
     
     local object = {Page = self, Name = name}
     function object:Section(sectionData)
@@ -2057,7 +2090,7 @@ function WindowMethods:KeybindList()
     local rowH = 18
     local bindsPadTop, bindsPadBot = 4, 6
     local initialY = headerH + bindsPadTop + 8 + bindsPadBot
-    local frame = new("CanvasGroup", {Position = UDim2.new(0, 14, 0.5, -40), Size = UDim2.fromOffset(minWidth, initialY), BackgroundColor3 = Library.Theme.Panel, BorderSizePixel = 0, Visible = false, GroupTransparency = 1, ZIndex = 9999, ClipsDescendants = true}, self.Gui)
+    local frame = new("Frame", {Position = UDim2.new(0, 14, 0.5, -40), Size = UDim2.fromOffset(minWidth, initialY), BackgroundColor3 = Library.Theme.Panel, BorderSizePixel = 0, Visible = false, ZIndex = 9999, ClipsDescendants = true}, self.Gui)
     round(frame, 6)
     softOuterGlow(frame, Library.Theme.Stroke, 5, 1, 0.32)
     local bindsBg = new("Frame", {Size = UDim2.new(1, 0, 1, -headerH), Position = UDim2.fromOffset(0, headerH), BackgroundColor3 = Library.Theme.Panel, BackgroundTransparency = 0, BorderSizePixel = 0, ZIndex = 9998, ClipsDescendants = true}, frame)
@@ -2089,21 +2122,21 @@ function WindowMethods:KeybindList()
         object.Shown = true
         if object.IntroPending then
             frame.Visible = false
-            frame.GroupTransparency = 1
+            
             return
         end
         frame.Visible = true
-        frame.GroupTransparency = 1
-        tween(frame, {GroupTransparency = 0}, 0.2, Enum.EasingStyle.Quint)
+        
+        frame.Visible = true
     end
     local function hide()
         if not object.Shown then frame.Visible = false return end
         object.Shown = false
-        tween(frame, {GroupTransparency = 1}, 0.15).Completed:Connect(function() if not object.Shown then frame.Visible = false end end)
+        frame.Visible = false
     end
     local function makeRow(key, modeText, nameText, keyText, order)
         local row = new("Frame", {Name = "row_" .. key, Size = UDim2.new(1, 0, 0, rowH), BackgroundTransparency = 1, BorderSizePixel = 0, LayoutOrder = order, ZIndex = 10000}, holder)
-        local inner = new("CanvasGroup", {Size = UDim2.new(1, 0, 1, 0), Position = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1, BorderSizePixel = 0, GroupTransparency = 1, ZIndex = 10001}, row)
+        local inner = new("Frame", {Size = UDim2.new(1, 0, 1, 0), Position = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 10001}, row)
         local innerLayout = new("UIListLayout", {FillDirection = Enum.FillDirection.Horizontal, VerticalAlignment = Enum.VerticalAlignment.Center, Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder}, inner)
         new("UIPadding", {PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4)}, inner)
         local modeLbl = new("TextLabel", {Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, BackgroundTransparency = 1, Text = "[" .. modeText .. "]", TextColor3 = Library.Theme.Dim, TextSize = 11, LayoutOrder = 1, ZIndex = 10002}, inner)
@@ -2116,7 +2149,7 @@ function WindowMethods:KeybindList()
         end)
         task.defer(function()
             if inner and inner.Parent then
-                tween(inner, {Position = UDim2.new(0, 0, 0, 0), GroupTransparency = 0}, 0.22, Enum.EasingStyle.Quint)
+                inner.Position = UDim2.new(0, 0, 0, 0)
             end
             if updateSize then updateSize() end
         end)
