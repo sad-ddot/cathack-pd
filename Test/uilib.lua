@@ -28,13 +28,13 @@ local Library = {
     MenuKeybind = Enum.KeyCode.RightShift,
     Version = "1.0.0-alpha",
     Theme = {
-        Bg = Color3.fromRGB(18, 18, 18),
-        Panel = Color3.fromRGB(18, 18, 18),
-        Header = Color3.fromRGB(25, 25, 25),
-        Input = Color3.fromRGB(31, 31, 31),
-        Control = Color3.fromRGB(23, 24, 28),
+        Bg = Color3.fromRGB(8, 8, 8),
+        Panel = Color3.fromRGB(8, 8, 8),
+        Header = Color3.fromRGB(14, 14, 14),
+        Input = Color3.fromRGB(18, 18, 18),
+        Control = Color3.fromRGB(12, 12, 12),
         ControlHover = Color3.fromRGB(34, 35, 40),
-        Stroke = Color3.fromRGB(35, 35, 38),
+        Stroke = Color3.fromRGB(30, 30, 32),
         Accent = Color3.fromRGB(56, 175, 255),
         Accent2 = Color3.fromRGB(165, 255, 0),
         AccentDk = Color3.fromRGB(105, 116, 151),
@@ -49,9 +49,9 @@ local Library = {
 
 Library.ThemePresets = {
     Default = {
-        Bg = Color3.fromRGB(18, 18, 18), Panel = Color3.fromRGB(18, 18, 18), Header = Color3.fromRGB(25, 25, 25),
-        Input = Color3.fromRGB(31, 31, 31), Control = Color3.fromRGB(23, 24, 28), ControlHover = Color3.fromRGB(34, 35, 40),
-        Stroke = Color3.fromRGB(35, 35, 38), Accent = Color3.fromRGB(56, 175, 255), Accent2 = Color3.fromRGB(165, 255, 0),
+        Bg = Color3.fromRGB(8, 8, 8), Panel = Color3.fromRGB(8, 8, 8), Header = Color3.fromRGB(14, 14, 14),
+        Input = Color3.fromRGB(18, 18, 18), Control = Color3.fromRGB(12, 12, 12), ControlHover = Color3.fromRGB(34, 35, 40),
+        Stroke = Color3.fromRGB(30, 30, 32), Accent = Color3.fromRGB(56, 175, 255), Accent2 = Color3.fromRGB(165, 255, 0),
         AccentDk = Color3.fromRGB(105, 116, 151), Text = Color3.fromRGB(211, 211, 211), Dim = Color3.fromRGB(139, 139, 139),
         Risky = Color3.fromRGB(220, 80, 85), ButtonTop = Color3.fromRGB(24, 26, 31), ButtonBottom = Color3.fromRGB(48, 52, 62),
     },
@@ -519,7 +519,16 @@ function Library:Window(data)
     local parent = getParent()
     local gui = new("ScreenGui", {Name = title .. "_" .. tostring(math.random(10000, 99999)), IgnoreGuiInset = true, ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling}, parent)
     local popupLayer = new("Frame", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 9000}, gui)
-    local main = new("CanvasGroup", {Size = UDim2.fromOffset(700, 450), Position = UDim2.new(0.5, 0, 0.5, 0), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = Library.Theme.Bg, BorderSizePixel = 0, GroupTransparency = 1, Visible = false}, gui)
+    
+    local main = new("Frame", {
+        Size = UDim2.fromOffset(750, 480), 
+        Position = UDim2.new(0.5, 0, 0.5, 0), 
+        AnchorPoint = Vector2.new(0.5, 0.5), 
+        BackgroundColor3 = Color3.fromRGB(8, 8, 8), 
+        BorderSizePixel = 0, 
+        Visible = false
+    }, gui)
+    
     local mainScale = new("UIScale", {Scale = 0.985}, main)
     round(main, 4)
     local mainStrokes = softOuterGlow(main, Library.Theme.Stroke, 5, 1, 0.3)
@@ -534,8 +543,8 @@ function Library:Window(data)
     local sidebar = new("Frame", {
         Name = "Sidebar",
         Parent = main,
-        Size = UDim2.new(0, 120, 1, 0),
-        BackgroundColor3 = Color3.fromRGB(13, 13, 15),
+        Size = UDim2.new(0, 125, 1, 0),
+        BackgroundColor3 = Color3.fromRGB(6, 6, 6),
         BorderSizePixel = 0,
         ZIndex = 10
     })
@@ -550,7 +559,7 @@ function Library:Window(data)
         ZIndex = 11
     })
     
-    local header = new("Frame", {Size = UDim2.new(1, -120, 0, 38), Position = UDim2.fromOffset(120, 0), BackgroundColor3 = Library.Theme.Bg, BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 10}, main)
+    local header = new("Frame", {Size = UDim2.new(1, -125, 0, 38), Position = UDim2.fromOffset(125, 0), BackgroundColor3 = Library.Theme.Bg, BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 10}, main)
     
     local logo = new("Frame", {Size = UDim2.fromOffset(26, 26), Position = UDim2.fromOffset(12, 12), BackgroundColor3 = Library.Theme.Accent, BackgroundTransparency = 0, BorderSizePixel = 0, ZIndex = 12}, sidebar)
     round(logo, 6)
@@ -579,7 +588,7 @@ function Library:Window(data)
     local underline = new("Frame", {Size = UDim2.fromOffset(0, 0), Position = UDim2.fromOffset(0, 0), BackgroundColor3 = Library.Theme.Accent, BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false}, main)
     local underlineBloom = new("UIStroke", {Color = Library.Theme.Accent, Thickness = 4, Transparency = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border}, underline)
     
-    local pageRoot = new("Frame", {Size = UDim2.new(1, -135, 1, -20), Position = UDim2.fromOffset(125, 10), BackgroundTransparency = 1, ClipsDescendants = true, ZIndex = 10}, main)
+    local pageRoot = new("Frame", {Size = UDim2.new(1, -140, 1, -20), Position = UDim2.fromOffset(130, 10), BackgroundTransparency = 1, ClipsDescendants = true, ZIndex = 10}, main)
     
     local notifyHolder = new("Frame", {AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -14, 1, -14), Size = UDim2.fromOffset(260, 360), BackgroundTransparency = 1, ZIndex = 9500}, gui)
     new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6), VerticalAlignment = Enum.VerticalAlignment.Bottom}, notifyHolder)
@@ -589,17 +598,15 @@ function Library:Window(data)
     
     task.defer(function()
         main.Visible = true
-        tween(main, {GroupTransparency = 0}, 0.22)
-        tween(mainScale, {Scale = 1}, 0.22, Enum.EasingStyle.Back)
+        mainScale.Scale = 1
         for i, s in ipairs(mainStrokes) do
-            tween(s, {Transparency = mainStrokeTargets[i]}, 0.28)
+            s.Transparency = mainStrokeTargets[i]
         end
         for _, w in ipairs(window.IntroWidgets) do
             if w.Object and w.Object.Parent then
                 if w.KL then w.KL.IntroPending = false end
                 w.Object.Visible = true
-                w.Object.GroupTransparency = 1
-                tween(w.Object, {GroupTransparency = 0}, 0.22)
+                w.Object.GroupTransparency = 0
             end
         end
     end)
@@ -640,24 +647,21 @@ function WindowMethods:SetOpen(value)
     Library:CloseSettingsPopups()
     if self.Open then
         self.Main.Visible = true
-        if self.ESPPreviewObject and self.ESPPreviewObject.Visible then if self.ESPPreviewObject.DockLeft then self.ESPPreviewObject:DockLeft() end self.ESPPreviewObject.Frame.Visible = true end
-        self.Main.GroupTransparency = 1
+        if self.ESPPreviewObject and self.ESPPreviewObject.Visible then 
+            if self.ESPPreviewObject.DockLeft then self.ESPPreviewObject:DockLeft() end 
+            self.ESPPreviewObject.Frame.Visible = true 
+        end
         local targetScale = Library.UIScale or 1
-        if self.MainScale then self.MainScale.Scale = targetScale * 0.985 end
-        tween(self.Main, {GroupTransparency = 0}, 0.18)
-        if self.MainScale then tween(self.MainScale, {Scale = targetScale}, 0.18, Enum.EasingStyle.Back) end
+        if self.MainScale then self.MainScale.Scale = targetScale end
         for i, strokeObject in ipairs(self.MainStrokes or {}) do
-            tween(strokeObject, {Transparency = (self.MainStrokeTargets or {})[i] or 0.3}, 0.18)
+            strokeObject.Transparency = (self.MainStrokeTargets or {})[i] or 0.3
         end
     else
         if self.ESPPreviewObject then self.ESPPreviewObject.Frame.Visible = false end
         for _, closer in pairs(Library.OpenFrames) do pcall(closer) end
         Library.OpenFrames = {}
-        if self.MainScale then tween(self.MainScale, {Scale = (Library.UIScale or 1) * 0.985}, 0.16) end
-        for _, strokeObject in ipairs(self.MainStrokes or {}) do tween(strokeObject, {Transparency = 1}, 0.16) end
-        tween(self.Main, {GroupTransparency = 1}, 0.16).Completed:Connect(function()
-            if not self.Open then self.Main.Visible = false end
-        end)
+        self.Main.Visible = false
+        for _, strokeObject in ipairs(self.MainStrokes or {}) do strokeObject.Transparency = 1 end
     end
 end
 
@@ -762,8 +766,8 @@ function WindowMethods:Page(data)
         tabText.Size = UDim2.new(1, -30, 1, 0)
     end
 
-    local page = new("CanvasGroup", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, GroupTransparency = 1, Visible = false, ZIndex = 11}, self.PageRoot)
-    local pageScale = new("UIScale", {Scale = 0.985}, page)
+    local page = new("Frame", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Visible = false, ZIndex = 11}, self.PageRoot)
+    local pageScale = new("UIScale", {Scale = 1}, page)
     local left = new("ScrollingFrame", {Size = UDim2.new(0.5, -5, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 2, ScrollBarImageColor3 = Library.Theme.AccentDk, CanvasSize = UDim2.new(0, 0, 0, 0), ZIndex = 12}, page)
     local right = new("ScrollingFrame", {Size = UDim2.new(0.5, -5, 1, 0), Position = UDim2.new(0.5, 5, 0, 0), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 2, ScrollBarImageColor3 = Library.Theme.AccentDk, CanvasSize = UDim2.new(0, 0, 0, 0), ZIndex = 12}, page)
     local leftLayout = new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8)}, left)
@@ -791,19 +795,7 @@ function WindowMethods:SelectPage(name)
     self.CurrentPage = name
     for pageName, page in pairs(self.Pages) do
         local active = pageName == name
-        if active then
-            if not page.Page.Visible then
-                page.Page.Visible = true
-                page.Page.Position = UDim2.fromOffset(10, 0)
-                page.Page.GroupTransparency = 1
-            end
-            if page.PageScale then page.PageScale.Scale = 0.985 end
-            tween(page.Page, {GroupTransparency = 0, Position = UDim2.fromOffset(0, 0)}, 0.2)
-            if page.PageScale then tween(page.PageScale, {Scale = 1}, 0.2) end
-        else
-            page.Page.Visible = false
-            page.Page.GroupTransparency = 1
-        end
+        page.Page.Visible = active
     end
     for tabName, tab in pairs(self.Tabs) do
         local active = tabName == name
@@ -811,13 +803,13 @@ function WindowMethods:SelectPage(name)
         local indicator = tab:FindFirstChild("Indicator")
         local icon = tab:FindFirstChild("Icon")
         if label then
-            tween(label, {TextColor3 = active and Library.Theme.Text or Library.Theme.Dim}, 0.18)
+            tween(label, {TextColor3 = active and Library.Theme.Text or Library.Theme.Dim}, 0.12)
         end
         if indicator then
-            tween(indicator, {BackgroundTransparency = active and 0 or 1}, 0.18)
+            tween(indicator, {BackgroundTransparency = active and 0 or 1}, 0.12)
         end
         if icon then
-            tween(icon, {TextColor3 = active and Library.Theme.Accent or Library.Theme.Dim}, 0.18)
+            tween(icon, {TextColor3 = active and Library.Theme.Accent or Library.Theme.Dim}, 0.12)
         end
     end
 end
@@ -836,14 +828,14 @@ function PageMethods:Section(data)
     local title = data.Name or data.name or "Section"
     local side = data.Side or data.side or 1
     local parent = side == 2 and self.Right or self.Left
-    local section = new("CanvasGroup", {Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, BorderSizePixel = 0}, parent)
+    local section = new("Frame", {Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 11}, parent)
     local scale = new("UIScale", {Scale = 1}, section)
-    local header = new("Frame", {Size = UDim2.new(1, 0, 0, 24), BackgroundColor3 = Library.Theme.Header, BorderSizePixel = 0}, section)
+    local header = new("Frame", {Size = UDim2.new(1, 0, 0, 24), BackgroundColor3 = Library.Theme.Header, BorderSizePixel = 0, ZIndex = 12}, section)
     round(header, 3)
-    local stripe = new("Frame", {Size = UDim2.new(0, 3, 1, 0), BackgroundColor3 = Library.Theme.Accent, BorderSizePixel = 0}, header)
+    local stripe = new("Frame", {Size = UDim2.new(0, 3, 1, 0), BackgroundColor3 = Library.Theme.Accent, BorderSizePixel = 0, ZIndex = 13}, header)
     round(stripe, 2)
-    new("TextLabel", {Size = UDim2.new(1, -26, 0, 20), Position = UDim2.fromOffset(18, 2), BackgroundTransparency = 1, Text = title, TextColor3 = Library.Theme.Text, TextSize = 13, FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal), TextXAlignment = Enum.TextXAlignment.Left}, header)
-    local body = new("Frame", {Size = UDim2.new(1, -20, 0, 10), Position = UDim2.fromOffset(10, 30), BackgroundTransparency = 1}, section)
+    new("TextLabel", {Size = UDim2.new(1, -26, 0, 20), Position = UDim2.fromOffset(18, 2), BackgroundTransparency = 1, Text = title, TextColor3 = Library.Theme.Text, TextSize = 11, FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 13}, header)
+    local body = new("Frame", {Size = UDim2.new(1, -20, 0, 10), Position = UDim2.fromOffset(10, 30), BackgroundTransparency = 1, ZIndex = 12}, section)
     local layout = new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 5)}, body)
     connect(layout:GetPropertyChangedSignal("AbsoluteContentSize"), function()
         body.Size = UDim2.new(1, -20, 0, layout.AbsoluteContentSize.Y)
@@ -955,10 +947,6 @@ function PageMethods:SubPage(data)
                 if visible then
                     section.Section.Parent = section.Side == 2 and self.Right or self.Left
                     section.Section.Visible = true
-                    section.Section.GroupTransparency = 1
-                    if section.Scale then section.Scale.Scale = 0.98 end
-                    tween(section.Section, {GroupTransparency = 0}, 0.16)
-                    if section.Scale then tween(section.Scale, {Scale = 1}, 0.16) end
                 else
                     section.Section.Visible = false
                     if self.SubPageHidden then section.Section.Parent = self.SubPageHidden end
