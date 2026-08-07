@@ -934,11 +934,9 @@ function PageMethods:SubPage(data)
         })
 
         self.SubPageHidden = new("Frame", {Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false}, self.Page)
-        new("UIListLayout", {FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 15), SortOrder = Enum.SortOrder.LayoutOrder, VerticalAlignment = Enum.VerticalAlignment.Center}, self.SubPageRoot)
-        new("UIPadding", {PaddingLeft = UDim.new(0, 10)}, self.SubPageRoot)
         
         self.Left.Position = UDim2.new(0, 0, 0, 35)
-        self.Left.Size = UDim2.new(1, 0, 1, -35) -- Use 100% Y size minus top offset!
+        self.Left.Size = UDim2.new(0.5, -5, 1, -35)
         self.Right.Position = UDim2.new(0.5, 5, 0, 35)
         self.Right.Size = UDim2.new(0.5, -5, 1, -35)
         
@@ -966,10 +964,13 @@ function PageMethods:SubPage(data)
         end
     end
     
-    local buttonWidth = 75 -- Solid, clean, completely bug-free fixed width!
+    local buttonWidth = 75
+    local index = #self.SubPages + 1
+    local buttonX = 10 + (index - 1) * (75 + 15)
 
     local button = new("TextButton", {
-        Size = UDim2.new(0, buttonWidth, 1, 0),
+        Size = UDim2.new(0, buttonWidth, 0, 30),
+        Position = UDim2.fromOffset(buttonX, 0),
         BackgroundColor3 = Color3.new(1, 1, 1),
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
@@ -978,8 +979,9 @@ function PageMethods:SubPage(data)
         TextSize = 12,
         FontFace = Library.Font,
         TextXAlignment = Enum.TextXAlignment.Center,
+        TextYAlignment = Enum.TextYAlignment.Center,
         AutoButtonColor = false,
-        LayoutOrder = #self.SubPages + 1,
+        LayoutOrder = index,
         ZIndex = 21
     }, self.SubPageRoot)
     
@@ -998,7 +1000,7 @@ function PageMethods:SubPage(data)
     
     connect(button.MouseButton1Click, function() self:SelectSubPage(name) end)
     connect(button.MouseEnter, function() if self.CurrentSubPage ~= name then tween(button, {TextColor3 = Library.Theme.Text}, 0.12) end end)
-    connect(button.MouseLeave, function() if self.CurrentSubPage ~= name then tween(button, {TextColor3 = Library.Theme.Dim}, 0.12) end end)
+    connect(button.MouseLeave, function() if self.CurrentPage ~= name then tween(button, {TextColor3 = Library.Theme.Dim}, 0.12) end end)
     
     local object = {Page = self, Name = name}
     function object:Section(sectionData)
