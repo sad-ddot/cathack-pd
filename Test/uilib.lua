@@ -967,9 +967,15 @@ function PageMethods:SubPage(data)
         end
     end
     
+    local TextService = game:GetService("TextService")
+    local textWidth = 60
+    pcall(function()
+        textWidth = TextService:GetTextSize(name, 12, Enum.Font.GothamMedium, Vector2.new(1000, 1000)).X
+    end)
+    local buttonWidth = textWidth + 16
+
     local button = new("TextButton", {
-        Size = UDim2.new(0, 0, 1, 0),
-        AutomaticSize = Enum.AutomaticSize.X,
+        Size = UDim2.new(0, buttonWidth, 1, 0),
         BackgroundColor3 = Color3.new(1, 1, 1),
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
