@@ -35,7 +35,7 @@ local Library = {
         Control = Color3.fromRGB(12, 12, 12),
         ControlHover = Color3.fromRGB(34, 35, 40),
         Stroke = Color3.fromRGB(30, 30, 32),
-        Accent = Color3.fromRGB(166, 178, 220),
+        Accent = Color3.fromRGB(56, 175, 255),
         Accent2 = Color3.fromRGB(112, 151, 235),
         AccentDk = Color3.fromRGB(105, 116, 151),
         Text = Color3.fromRGB(211, 211, 211),
@@ -51,7 +51,7 @@ Library.ThemePresets = {
     Default = {
         Bg = Color3.fromRGB(8, 8, 8), Panel = Color3.fromRGB(8, 8, 8), Header = Color3.fromRGB(14, 14, 14),
         Input = Color3.fromRGB(18, 18, 18), Control = Color3.fromRGB(12, 12, 12), ControlHover = Color3.fromRGB(34, 35, 40),
-        Stroke = Color3.fromRGB(30, 30, 32), Accent = Color3.fromRGB(166, 178, 220), Accent2 = Color3.fromRGB(112, 151, 235),
+        Stroke = Color3.fromRGB(30, 30, 32), Accent = Color3.fromRGB(56, 175, 255), Accent2 = Color3.fromRGB(112, 151, 235),
         AccentDk = Color3.fromRGB(105, 116, 151), Text = Color3.fromRGB(211, 211, 211), Dim = Color3.fromRGB(139, 139, 139),
         Risky = Color3.fromRGB(220, 80, 85), ButtonTop = Color3.fromRGB(24, 26, 31), ButtonBottom = Color3.fromRGB(48, 52, 62),
     },
@@ -529,7 +529,7 @@ function Library:Window(data)
         Visible = false
     }, gui)
     
-    local mainScale = new("UIScale", {Scale = 0.92}, main)
+    local mainScale = new("UIScale", {Scale = 0.95}, main)
     round(main, 4)
     local mainStrokes = softOuterGlow(main, Library.Theme.Stroke, 5, 1, 0.3)
     for _, s in ipairs(mainStrokes) do s.Transparency = 1 end
@@ -544,7 +544,7 @@ function Library:Window(data)
         Name = "Sidebar",
         Parent = main,
         Size = UDim2.new(0, 125, 1, 0),
-        BackgroundColor3 = Color3.fromRGB(8, 8, 8), 
+        BackgroundColor3 = Color3.fromRGB(6, 6, 6),
         BorderSizePixel = 0,
         ZIndex = 10
     })
@@ -598,7 +598,7 @@ function Library:Window(data)
     
     task.defer(function()
         main.Visible = true
-        tween(mainScale, {Scale = 1}, 0.3, Enum.EasingStyle.Back)
+        tween(mainScale, {Scale = 1}, 0.25, Enum.EasingStyle.Back)
         for i, s in ipairs(mainStrokes) do
             s.Transparency = mainStrokeTargets[i]
         end
@@ -814,7 +814,7 @@ function WindowMethods:SelectPage(name)
         local indicator = tab:FindFirstChild("Indicator")
         local icon = tab:FindFirstChild("Icon")
         if label then
-            tween(label, {TextColor3 = active and Library.Theme.Text or Library.Theme.Dim}, 0.12)
+            tween(label, {TextColor3 = active and Library.Theme.Accent or Library.Theme.Dim}, 0.12)
         end
         if indicator then
             tween(indicator, {BackgroundTransparency = active and 0 or 1}, 0.12)
@@ -916,8 +916,8 @@ function PageMethods:SubPage(data)
             Name = "SubPageRoot",
             Parent = self.Page,
             Size = UDim2.new(1, 0, 0, 30),
-            Position = UDim2.fromOffset(0, 0),
-            BackgroundColor3 = Color3.fromRGB(8, 8, 8), -- Same as menu background color!
+            Position = UDim2.fromOffset(0, -4), -- Raised slightly!
+            BackgroundColor3 = Color3.fromRGB(8, 8, 8), -- Seamless matching background!
             BorderSizePixel = 0,
             ZIndex = 20
         })
@@ -935,10 +935,10 @@ function PageMethods:SubPage(data)
 
         self.SubPageHidden = new("Frame", {Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false}, self.Page)
         
-        self.Left.Position = UDim2.new(0, 0, 0, 35)
-        self.Left.Size = UDim2.new(0.5, -5, 1, -35)
-        self.Right.Position = UDim2.new(0.5, 5, 0, 35)
-        self.Right.Size = UDim2.new(0.5, -5, 1, -35)
+        self.Left.Position = UDim2.new(0, 0, 0, 31)
+        self.Left.Size = UDim2.new(0.5, -5, 1, -31)
+        self.Right.Position = UDim2.new(0.5, 5, 0, 31)
+        self.Right.Size = UDim2.new(0.5, -5, 1, -31)
         
         function self:SelectSubPage(label)
             Library:CloseCustomPopups()
@@ -951,6 +951,7 @@ function PageMethods:SubPage(data)
                 tween(buttonData.Button, {TextColor3 = on and Library.Theme.Accent or Library.Theme.Dim, BackgroundTransparency = 1}, 0.16)
                 tween(buttonData.Accent, {BackgroundTransparency = on and 0 or 1}, 0.16)
                 tween(buttonData.Glow, {BackgroundTransparency = on and 0.55 or 1}, 0.16)
+                tween(buttonData.Highlight, {BackgroundTransparency = on and 0.95 or 1}, 0.16)
             end
             for _, section in ipairs(self.Sections) do
                 local visible = section.SubPage == label or section.SubPage == nil
@@ -986,9 +987,22 @@ function PageMethods:SubPage(data)
         ZIndex = 21
     }, self.SubPageRoot)
     
+    local highlight = new("Frame", {
+        Name = "Highlight",
+        Parent = button,
+        Size = UDim2.new(1, 0, 1, -4),
+        Position = UDim2.new(0, 0, 0, 2),
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ZIndex = 20
+    })
+    round(highlight, 4)
+    
     local accent = new("Frame", {
-        Size = UDim2.new(1, 0, 0, 2),
-        Position = UDim2.new(0, 0, 1, -2),
+        Size = UDim2.new(0.5, 0, 0, 2), -- 50% width!
+        AnchorPoint = Vector2.new(0.5, 0), -- Centered!
+        Position = UDim2.new(0.5, 0, 1, -2), -- Centered!
         BackgroundColor3 = Library.Theme.Accent,
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
@@ -996,22 +1010,12 @@ function PageMethods:SubPage(data)
     })
     accent.Parent = button
     
-    new("UIGradient", {
-        Rotation = 0,
-        Color = ColorSequence.new(Library.Theme.Accent, Library.Theme.Accent),
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 1),
-            NumberSequenceKeypoint.new(0.2, 0),
-            NumberSequenceKeypoint.new(0.8, 0),
-            NumberSequenceKeypoint.new(1, 1)
-        })
-    }, accent)
-    
     local glow = new("Frame", {
         Name = "Glow",
         Parent = button,
-        Size = UDim2.new(1, 10, 0, 5),
-        Position = UDim2.new(0, -5, 1, -2),
+        Size = UDim2.new(0.5, 8, 0, 4), -- Glow matches centered accent size!
+        AnchorPoint = Vector2.new(0.5, 0),
+        Position = UDim2.new(0.5, 0, 1, -2),
         BackgroundColor3 = Library.Theme.Accent,
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
@@ -1028,7 +1032,7 @@ function PageMethods:SubPage(data)
         })
     }, glow)
     
-    self.SubPageButtons[name] = {Button = button, Accent = accent, Glow = glow}
+    self.SubPageButtons[name] = {Button = button, Accent = accent, Glow = glow, Highlight = highlight}
     self.SubPages[#self.SubPages + 1] = name
     
     connect(button.MouseButton1Click, function() self:SelectSubPage(name) end)
@@ -1066,7 +1070,7 @@ function SectionMethods:Checkbox(name, default, callback, style)
     else
         riskyColor = Library.Theme.UnstableText or Color3.fromRGB(255, 210, 70)
     end
-    local row = new("TextButton", {Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, Text = "", AutoButtonColor = false}, self.Body)
+    local row = new("TextButton", {Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = "", AutoButtonColor = false}, self.Body)
     local box = new("Frame", {Size = UDim2.fromOffset(13, 13), Position = UDim2.new(0, 0, 0.5, -6), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 8}, row)
     round(box, 2)
     new("UIGradient", {Rotation = 90, Color = ColorSequence.new(Library.Theme.Header, Library.Theme.Header)}, box)
@@ -1658,9 +1662,9 @@ function SectionMethods:Slider(data, minArg, maxArg, defaultArg, suffixArg, call
         decimals = math.floor(-math.log10(decimals) + 0.5)
     end
     decimals = math.floor(math.max(decimals or 0, 0))
-    local holder = new("Frame", {Size = UDim2.new(1, 0, 0, 45), BackgroundTransparency = 1}, self.Body)
+    local holder = new("Frame", {Size = UDim2.new(1, 0, 0, 50), BackgroundTransparency = 1}, self.Body)
     new("TextLabel", {Size = UDim2.new(0.7, 0, 0, 13), BackgroundTransparency = 1, Text = data.Name or flag, TextColor3 = Library.Theme.Dim, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left}, holder)
-    local track = new("Frame", {Size = UDim2.new(1, 0, 0, 6), Position = UDim2.fromOffset(0, 20), BackgroundColor3 = Library.Theme.Input, BorderSizePixel = 0, ClipsDescendants = false}, holder)
+    local track = new("Frame", {Size = UDim2.new(1, 0, 0, 6), Position = UDim2.fromOffset(0, 24), BackgroundColor3 = Library.Theme.Input, BorderSizePixel = 0, ClipsDescendants = false}, holder)
     round(track, 1)
     local startRatio = math.clamp((value - min) / math.max(max - min, 0.000001), 0, 1)
     local valueBox = new("Frame", {Size = UDim2.fromOffset(46, 16), AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(math.clamp(startRatio, 0.08, 0.92), 0, 1, 3), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 11}, track)
@@ -1674,7 +1678,7 @@ function SectionMethods:Slider(data, minArg, maxArg, defaultArg, suffixArg, call
     for index, glow in ipairs(fillGlow) do
         glow.Transparency = startRatio > 0 and math.min(1, 0.86 + (index - 1) * 0.035) or 1
     end
-    local knob = new("Frame", {Size = UDim2.fromOffset(12, 12), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(startRatio, 0, 0.5, 0), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1, Visible = false, BorderSizePixel = 0}, track)
+    local knob = new("Frame", {Size = UDim2.fromOffset(10, 10), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(startRatio, 0, 0.5, 0), BackgroundColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 0, Visible = true, BorderSizePixel = 0}, track)
     round(knob, 100)
     local hit = new("TextButton", {Size = UDim2.new(1, 0, 0, 24), Position = UDim2.new(0, 0, 0.5, -12), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 10}, track)
     local function roundValue(v)
@@ -1706,7 +1710,7 @@ function SectionMethods:Slider(data, minArg, maxArg, defaultArg, suffixArg, call
     end
     local dragging = false
     local function effect(on)
-        tween(knob, {Size = on and UDim2.fromOffset(14, 14) or UDim2.fromOffset(12, 12)}, 0.12)
+        tween(knob, {Size = on and UDim2.fromOffset(12, 12) or UDim2.fromOffset(10, 10)}, 0.12)
         tween(track, {BackgroundColor3 = on and Library.Theme.Stroke or Library.Theme.Input}, 0.12)
     end
     local function fromX(x)
@@ -1776,9 +1780,9 @@ function SectionMethods:Dropdown(data, optionsArg, defaultArg, callbackArg)
     local current = data.Default
     if type(current) == "number" then current = options[current] end
     if current == nil and #options > 0 then current = options[1] end
-    local holder = new("Frame", {Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1, ZIndex = 100}, self.Body)
+    local holder = new("Frame", {Size = UDim2.new(1, 0, 0, 42), BackgroundTransparency = 1, ZIndex = 100}, self.Body)
     new("TextLabel", {Size = UDim2.new(1, 0, 0, 12), BackgroundTransparency = 1, Text = data.Name or flag, TextColor3 = Library.Theme.Dim, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left}, holder)
-    local box = new("TextButton", {Size = UDim2.new(1, 0, 0, 22), Position = UDim2.fromOffset(0, 14), BackgroundTransparency = 1, BorderSizePixel = 0, Text = "", AutoButtonColor = false, ZIndex = 100}, holder)
+    local box = new("TextButton", {Size = UDim2.new(1, 0, 0, 25), Position = UDim2.fromOffset(0, 16), BackgroundTransparency = 1, BorderSizePixel = 0, Text = "", AutoButtonColor = false, ZIndex = 100}, holder)
     local boxBg = new("Frame", {Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Library.Theme.Header, BackgroundTransparency = 0, BorderSizePixel = 0, Active = false, ZIndex = 100}, box)
     round(boxBg, 4)
     local boxStroke = stroke(boxBg, Library.Theme.Stroke, 0.18)
@@ -1948,7 +1952,7 @@ end
 function SectionMethods:Label(labelText)
     local data = type(labelText) == "table" and labelText or {Name = labelText}
     local name = data.Name or data.Text or data.Label or "Label"
-    local row = new("Frame", {Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1}, self.Body)
+    local row = new("Frame", {Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1}, self.Body)
     local label = new("TextLabel", {Size = UDim2.new(1, -64, 1, 0), BackgroundTransparency = 1, Text = tostring(name), TextColor3 = Library.Theme.Dim, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left}, row)
     local sectionWindow = self.Window
     local sectionObject = self
@@ -1964,12 +1968,12 @@ end
 function SectionMethods:Textbox(data)
     data = data or {}
     local flag = data.Flag or data.Name or "Textbox"
-    local holder = new("Frame", {Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1}, self.Body)
+    local holder = new("Frame", {Size = UDim2.new(1, 0, 0, 50), BackgroundTransparency = 1}, self.Body)
     new("TextLabel", {Size = UDim2.new(1, 0, 0, 12), BackgroundTransparency = 1, Text = tostring(data.Name or flag), TextColor3 = Library.Theme.Dim, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left}, holder)
-    local bg = new("Frame", {Size = UDim2.new(1, 0, 0, 22), Position = UDim2.fromOffset(0, 15), BackgroundColor3 = Library.Theme.Header, BorderSizePixel = 0, ZIndex = 1}, holder)
+    local bg = new("Frame", {Size = UDim2.new(1, 0, 0, 25), Position = UDim2.fromOffset(0, 16), BackgroundColor3 = Library.Theme.Header, BorderSizePixel = 0, ZIndex = 1}, holder)
     round(bg, 4)
     stroke(bg, Library.Theme.Stroke, 0.18)
-    local box = new("TextBox", {Size = UDim2.new(1, 0, 0, 22), Position = UDim2.fromOffset(0, 15), BackgroundTransparency = 1, BorderSizePixel = 0, Text = tostring(data.Default or ""), PlaceholderText = tostring(data.Placeholder or ""), PlaceholderColor3 = Library.Theme.Dim, TextColor3 = Library.Theme.Text, TextTransparency = 0, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false, ZIndex = 2}, holder)
+    local box = new("TextBox", {Size = UDim2.new(1, 0, 0, 25), Position = UDim2.fromOffset(0, 16), BackgroundTransparency = 1, BorderSizePixel = 0, Text = tostring(data.Default or ""), PlaceholderText = tostring(data.Placeholder or ""), PlaceholderColor3 = Library.Theme.Dim, TextColor3 = Library.Theme.Text, TextTransparency = 0, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false, ZIndex = 2}, holder)
     new("UIPadding", {PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8)}, box)
     Library.Flags[flag] = box.Text
     connect(box.FocusLost, function()
@@ -1986,7 +1990,7 @@ end
 
 function SectionMethods:Button(label, callback)
     if type(label) == "table" then callback = label.Func or label.Callback; label = label.Text or label.Name end
-    local holder = new("Frame", {Size = UDim2.new(1, 0, 0, 23), BackgroundTransparency = 1, BorderSizePixel = 0}, self.Body)
+    local holder = new("Frame", {Size = UDim2.new(1, 0, 0, 28), BackgroundTransparency = 1, BorderSizePixel = 0}, self.Body)
     local bg = new("Frame", {Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Library.Theme.Header, BorderSizePixel = 0, ZIndex = 1}, holder)
     round(bg, 4)
     local btnStroke = stroke(bg, Library.Theme.Stroke, 0.18)
