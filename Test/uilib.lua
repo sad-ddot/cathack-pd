@@ -35,8 +35,8 @@ local Library = {
         Control = Color3.fromRGB(12, 12, 12),
         ControlHover = Color3.fromRGB(34, 35, 40),
         Stroke = Color3.fromRGB(30, 30, 32),
-        Accent = Color3.fromRGB(56, 175, 255),
-        Accent2 = Color3.fromRGB(165, 255, 0),
+        Accent = Color3.fromRGB(166, 178, 220),
+        Accent2 = Color3.fromRGB(112, 151, 235),
         AccentDk = Color3.fromRGB(105, 116, 151),
         Text = Color3.fromRGB(211, 211, 211),
         Dim = Color3.fromRGB(139, 139, 139),
@@ -51,7 +51,7 @@ Library.ThemePresets = {
     Default = {
         Bg = Color3.fromRGB(8, 8, 8), Panel = Color3.fromRGB(8, 8, 8), Header = Color3.fromRGB(14, 14, 14),
         Input = Color3.fromRGB(18, 18, 18), Control = Color3.fromRGB(12, 12, 12), ControlHover = Color3.fromRGB(34, 35, 40),
-        Stroke = Color3.fromRGB(30, 30, 32), Accent = Color3.fromRGB(56, 175, 255), Accent2 = Color3.fromRGB(165, 255, 0),
+        Stroke = Color3.fromRGB(30, 30, 32), Accent = Color3.fromRGB(166, 178, 220), Accent2 = Color3.fromRGB(112, 151, 235),
         AccentDk = Color3.fromRGB(105, 116, 151), Text = Color3.fromRGB(211, 211, 211), Dim = Color3.fromRGB(139, 139, 139),
         Risky = Color3.fromRGB(220, 80, 85), ButtonTop = Color3.fromRGB(24, 26, 31), ButtonBottom = Color3.fromRGB(48, 52, 62),
     },
@@ -521,7 +521,7 @@ function Library:Window(data)
     local popupLayer = new("Frame", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 9000}, gui)
     
     local main = new("Frame", {
-        Size = UDim2.fromOffset(750, 480), 
+        Size = UDim2.fromOffset(760, 490), 
         Position = UDim2.new(0.5, 0, 0.5, 0), 
         AnchorPoint = Vector2.new(0.5, 0.5), 
         BackgroundColor3 = Color3.fromRGB(8, 8, 8), 
@@ -529,7 +529,7 @@ function Library:Window(data)
         Visible = false
     }, gui)
     
-    local mainScale = new("UIScale", {Scale = 0.985}, main)
+    local mainScale = new("UIScale", {Scale = 0.95}, main)
     round(main, 4)
     local mainStrokes = softOuterGlow(main, Library.Theme.Stroke, 5, 1, 0.3)
     for _, s in ipairs(mainStrokes) do s.Transparency = 1 end
@@ -544,7 +544,7 @@ function Library:Window(data)
         Name = "Sidebar",
         Parent = main,
         Size = UDim2.new(0, 125, 1, 0),
-        BackgroundColor3 = Color3.fromRGB(6, 6, 6),
+        BackgroundColor3 = Color3.fromRGB(8, 8, 8), 
         BorderSizePixel = 0,
         ZIndex = 10
     })
@@ -598,7 +598,7 @@ function Library:Window(data)
     
     task.defer(function()
         main.Visible = true
-        mainScale.Scale = 1
+        tween(mainScale, {Scale = 1}, 0.25, Enum.EasingStyle.Back)
         for i, s in ipairs(mainStrokes) do
             s.Transparency = mainStrokeTargets[i]
         end
@@ -652,16 +652,21 @@ function WindowMethods:SetOpen(value)
             self.ESPPreviewObject.Frame.Visible = true 
         end
         local targetScale = Library.UIScale or 1
-        if self.MainScale then self.MainScale.Scale = targetScale end
+        self.MainScale.Scale = targetScale * 0.95
+        tween(self.MainScale, {Scale = targetScale}, 0.25, Enum.EasingStyle.Back)
         for i, strokeObject in ipairs(self.MainStrokes or {}) do
-            strokeObject.Transparency = (self.MainStrokeTargets or {})[i] or 0.3
+            tween(strokeObject, {Transparency = (self.MainStrokeTargets or {})[i] or 0.3}, 0.22)
         end
     else
         if self.ESPPreviewObject then self.ESPPreviewObject.Frame.Visible = false end
         for _, closer in pairs(Library.OpenFrames) do pcall(closer) end
         Library.OpenFrames = {}
-        self.Main.Visible = false
-        for _, strokeObject in ipairs(self.MainStrokes or {}) do strokeObject.Transparency = 1 end
+        for _, strokeObject in ipairs(self.MainStrokes or {}) do 
+            tween(strokeObject, {Transparency = 1}, 0.16) 
+        end
+        tween(self.MainScale, {Scale = 0.95}, 0.16, Enum.EasingStyle.Quad).Completed:Connect(function()
+            if not self.Open then self.Main.Visible = false end
+        end)
     end
 end
 
@@ -795,7 +800,16 @@ function WindowMethods:SelectPage(name)
     self.CurrentPage = name
     for pageName, page in pairs(self.Pages) do
         local active = pageName == name
-        page.Page.Visible = active
+        if active then
+            page.Page.Visible = true
+            page.Page.Position = UDim2.fromOffset(15, 0)
+            tween(page.Page, {Position = UDim2.fromOffset(0, 0)}, 0.22, Enum.EasingStyle.Quart)
+        else
+            page.Page.Visible = false
+        end
+        if page.SubPageRoot then
+            page.SubPageRoot.Visible = active
+        end
     end
     for tabName, tab in pairs(self.Tabs) do
         local active = tabName == name
@@ -903,12 +917,13 @@ function PageMethods:SubPage(data)
         
         self.SubPageRoot = new("Frame", {
             Name = "SubPageRoot",
-            Parent = self.Page,
-            Size = UDim2.new(1, 0, 0, 30),
-            Position = UDim2.fromOffset(0, 0),
+            Parent = self.Window.Main,
+            Size = UDim2.new(1, -140, 0, 30),
+            Position = UDim2.fromOffset(130, 10),
             BackgroundColor3 = Color3.fromRGB(15, 15, 17),
             BorderSizePixel = 0,
-            ZIndex = 20
+            ZIndex = 40,
+            Visible = false
         })
         
         local subDivider = new("Frame", {
@@ -919,7 +934,7 @@ function PageMethods:SubPage(data)
             BackgroundColor3 = Library.Theme.Stroke,
             BackgroundTransparency = 0.5,
             BorderSizePixel = 0,
-            ZIndex = 20
+            ZIndex = 40
         })
 
         self.SubPageHidden = new("Frame", {Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false}, self.Page)
@@ -974,7 +989,7 @@ function PageMethods:SubPage(data)
         TextXAlignment = Enum.TextXAlignment.Center,
         AutoButtonColor = false,
         LayoutOrder = #self.SubPages + 1,
-        ZIndex = 21
+        ZIndex = 41
     }, self.SubPageRoot)
     
     local accent = new("Frame", {
@@ -983,7 +998,7 @@ function PageMethods:SubPage(data)
         BackgroundColor3 = Library.Theme.Accent,
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
-        ZIndex = 22
+        ZIndex = 42
     })
     accent.Parent = button
     
@@ -1028,7 +1043,7 @@ function SectionMethods:Checkbox(name, default, callback, style)
     local row = new("TextButton", {Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, Text = "", AutoButtonColor = false}, self.Body)
     local box = new("Frame", {Size = UDim2.fromOffset(13, 13), Position = UDim2.new(0, 0, 0.5, -6), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 8}, row)
     round(box, 2)
-    new("UIGradient", {Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(12, 13, 15), Color3.fromRGB(23, 25, 30))}, box)
+    new("UIGradient", {Rotation = 90, Color = ColorSequence.new(Library.Theme.Header, Library.Theme.Header)}, box)
     local boxStroke = stroke(box, Library.Theme.Stroke, value and 1 or 0.35)
     local scale = new("UIScale", {Scale = 1}, box)
     local fill = new("Frame", {Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Library.Theme.Accent, BackgroundTransparency = value and 0 or 1, BorderSizePixel = 0, ZIndex = 9}, box)
